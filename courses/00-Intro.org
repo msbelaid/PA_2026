@@ -1,0 +1,356 @@
+#+TITLE: Advanced Programming
+#+AUTHOR: Mohammed Said BELAID @@latex:\\@@ said.belaid@univ-usto.dz
+#+SUBTITLE: Designing programs that scale with complexity
+#+DATE: 30/09/2026
+#+EMAIL: said.belaid@univ-usto.dz
+#+OPTIONS: H:2
+#+startup: beamer
+#+latex_header: \mode<beamer>{\usetheme{Antibes}}
+#+OPTIONS: listings:t
+#+LaTeX_CLASS: beamer
+#+LATEX_CLASS_OPTIONS: [aspectratio=169]
+#+LATEX_HEADER: \usepackage{listings}
+
+#+LATEX_HEADER: \lstset{
+#+LATEX_HEADER:   basicstyle=\ttfamily\tiny,
+#+LATEX_HEADER:   keywordstyle=\color{blue!70!black}\bfseries,
+#+LATEX_HEADER:   commentstyle=\color{green!45!black}\itshape,
+#+LATEX_HEADER:   stringstyle=\color{red!65!black},
+#+LATEX_HEADER:   backgroundcolor=\color{gray!8},
+#+LATEX_HEADER:   frame=single,
+#+LATEX_HEADER:   rulecolor=\color{gray!50},
+#+LATEX_HEADER:   breaklines=true,
+#+LATEX_HEADER:   showstringspaces=false
+#+LATEX_HEADER: }
+#+LaTeX_HEADER: \logo{\includegraphics[height=1cm]{../images/usto.png}}
+#+LATEX_HEADER: \usepackage{xcolor}
+
+* Advanced Programming?
+** Definition
+*** What makes a program "advanced"?
+    :PROPERTIES:
+    :BEAMER_env: alertblock
+    :END:
+    A program is not advanced simply because it uses an advanced
+    programming language or contains a lot of code.
+** Definition
+*** What makes a program "advanced"?
+    :PROPERTIES:
+    :BEAMER_col: 0.5
+    :BEAMER_env: exampleblock
+    :END:
+    A program becomes advanced when we need to deal with complexity.
+*** 
+    :PROPERTIES:
+    :BEAMER_col: 0.5
+    :BEAMER_env: column
+    :END:
+    - Complex problem solving
+    - Larger programs
+    - More developers
+    - Performance requirements
+    - Larger amounts of data
+    - Code reuse
+    - Long term maintenance
+
+** Definition
+*** Advanced Programming?
+    :PROPERTIES:
+    :BEAMER_env: block
+    :END:
+    Advanced programming is the set of techniques for designing programs
+that remain efficient, maintainable, reusable, and understandable as
+their complexity grows.
+* Algorithms
+
+** Why Algorithms?
+*** 
+    :PROPERTIES:
+    :BEAMER_env: column
+    :END:
+    Algorithms are at the heart of computer science.
+
+*** 
+    :PROPERTIES:
+    :BEAMER_env: column
+    :END:
+    - Fundamental to many areas: networks, cryptography, databases, AI, ...
+    - Programming languages are tools, problem solving skills are the most important
+    - Algorithmic thinking helps us break down and solve complex problems
+    - Studying algorithms develops logical and analytical thinking
+
+** Prerequisites
+*** 
+    :PROPERTIES:
+    :BEAMER_env: column
+    :END:
+    This course assumes that you already have
+
+*** 
+    :PROPERTIES:
+    :BEAMER_env: column
+    :END:
+
+    - Experience with at least one programming language
+    - Basic programming constructs: conditions and loops
+    - Basic data structures: arrays, linked lists, ...
+    - Basic algorithmic concepts
+    - Basic understanding of complexity analysis
+
+
+* What will we study?
+** Chapters
+*** Advanced Data Structures
+    :PROPERTIES:
+    :BEAMER_col: 0.25
+    :BEAMER_env: block
+    :END:
+    How can we organize data efficiently?
+
+*** Algorithmic Paradigms
+    :PROPERTIES:
+    :BEAMER_col: 0.25
+    :BEAMER_env: block
+    :END:
+    How can we design efficient algorithms?
+
+*** Programming Paradigms
+    :PROPERTIES:
+    :BEAMER_col: 0.25
+    :BEAMER_env: block
+    :END:
+    How can we structure our programs?
+
+*** Best Programming Practices
+    :PROPERTIES:
+    :BEAMER_col: 0.25
+    :BEAMER_env: block
+    :END:
+    How can we make our code maintainable?
+** Advanced Data Structures
+   - Excludes elementary data structures (linked lists, trees, heap ...)
+   - Hash tables
+   - Dynamic arrays
+   - Tries
+   - Probabilistic data structures
+** Algorithmic Paradigms
+*** How can we solve a problem?
+    - Brute force
+    - Divide and conquer
+    - Greedy algorithms
+    - Dynamic programming
+    - Backtracking
+    - Branch and bound
+    - Randomized algorithms
+
+** Programming Paradigms
+   - Procedural programming
+   - Object-oriented programming
+   - Functional programming
+   - ...
+** Best Programming Practices
+   Make software easier to understand, change, test, and maintain.
+   - Principles: SOLID, DRY, KISS, YAGNI
+   - Design: design patterns, antipatterns and code smells, refactoring
+   - Verification: unit testing, TDD
+
+
+* Review: Basic data structures
+** Basic data structures
+   - Arrays
+   - Linked lists
+   - Stacks
+   - Queues
+   - Trees
+   - Heaps (Tas)
+** Complexity Review
+
+| Data Structure    | Search    | Insert      | Delete      |
+|-------------------+-----------+-------------+-------------|
+| Array (unsorted)  | O(n)      | O(1)^{a}    | O(n)        |
+| Sorted Array      | O(log n)  | O(n)        | O(n)        |
+| Linked List       | O(n)      | O(1)^{b}    | O(1)^{c}    |
+| Stack (push/pop)  | --        | O(1)        | O(1)        |
+| Queue (enq/deq)   | --        | O(1)        | O(1)        |
+| BST (average)     | O(log n)  | O(log n)    | O(log n)    |
+| BST (worst)       | O(n)      | O(n)        | O(n)        |
+| Heap              | O(n)      | O(log n)    | O(log n)^{d} |
+
+#+BEGIN_EXPORT latex
+{\scriptsize (a) append at the end, if capacity allows \quad
+(b) at the head \quad
+(c) given a reference to the node \quad
+(d) removing the root (min/max)}
+#+END_EXPORT
+
+** Importance of Data Structures
+
+*** Problem 1
+    :PROPERTIES:
+    :BEAMER_col: 0.5
+    :END:
+**** Problem 1
+    :PROPERTIES:
+    :BEAMER_envargs: <1->
+    :BEAMER_env: block
+    :END:
+    An operating system manages many processes. Each process has a priority.
+    - Add a new process
+    - Find the highest-priority process
+    - Remove the selected process
+**** Solution 3 (Max Heap)
+     :PROPERTIES:
+     :BEAMER_act: <4->
+     :BEAMER_env: exampleblock
+     :END:
+ Find highest priority → $O(1)$
+
+ Insert               → $O(log(n))$
+
+ Remove               → $O(log(n))$
+
+*** Solution
+    :PROPERTIES:
+    :BEAMER_col: 0.5
+    :END:
+**** Solution 1 (Array)
+     :PROPERTIES:
+     :BEAMER_act: <2->
+     :BEAMER_env: alertblock
+     :END:
+ Find highest priority → $O(n)$
+
+ Insert               → $O(1)$ (append at the end)
+
+ Remove               → $O(n)$
+
+**** Solution 2 (Sorted Array, ascending)
+     :PROPERTIES:
+     :BEAMER_act: <3->
+     :BEAMER_env: alertblock
+     :END:
+ Find highest priority → $O(1)$ (last element)
+
+ Insert               → $O(n)$
+
+ Remove               → $O(1)$ (remove the last element)
+
+** Importance of Data Structures
+
+*** Problem 2
+    :PROPERTIES:
+    :BEAMER_col: 0.5
+    :END:
+**** Problem 2 
+    :PROPERTIES:
+    :BEAMER_envargs: <1->
+    :BEAMER_env: block
+    :END:
+    We have a linked list containing messages
+    waiting to be processed.
+
+    We frequently call the ~size()~ function.
+**** Solution 2 (update the structure)
+     :PROPERTIES:
+     :BEAMER_act: <3->
+     :BEAMER_env: exampleblock
+     :END:
+    #+BEGIN_SRC java
+    class LinkedList {
+        Node head;
+        int size;
+        int size() {
+            return size;
+        }
+    }
+    #+END_SRC
+    Each insert ~size++~. Each delete ~size--~
+ List size → $O(1)$
+
+*** Solution
+    :PROPERTIES:
+    :BEAMER_col: 0.5
+    :END:
+**** Solution 1
+     :PROPERTIES:
+     :BEAMER_act: <2->
+     :BEAMER_env: alertblock
+     :END:
+    #+BEGIN_SRC java
+    int size() {
+        Node current = head;
+        int count = 0;
+        while (current != null) {
+            count++;
+            current = current.next;
+        }
+        return count;
+    }
+    #+END_SRC
+
+ List size → $O(n)$
+
+
+** The Important Lesson
+
+*** Data structure choice
+    :PROPERTIES:
+    :BEAMER_col: 0.5
+    :BEAMER_env: exampleblock
+    :END:
+
+    The choice of a data structure
+    depends on the operations we perform most often.
+
+***  
+    :PROPERTIES:
+    :BEAMER_col: 0.5
+    :END:
+    Before choosing a data structure
+    - What operations do we perform?
+    - How frequently do we perform them?
+    - How large can the data become?
+    - What are the performance requirements?
+
+* Introduction to the next course
+
+** A simple problem
+
+*** Find student
+    We have 1,000,000 students.
+
+    We want to find a student using their ID or name
+
+*** The obvious solution
+     :PROPERTIES:
+     :BEAMER_env: alertblock
+     :END:
+     Search the list from beginning to end.
+
+     Worst case: $O(n)$
+
+** Can we do better?
+*** Is there a more optimal approach?
+    :PROPERTIES:
+    :BEAMER_env: block
+    :END:
+    What if we could go directly from:
+
+    Student ID or name to the student
+
+** The idea
+
+*** Solution
+    :PROPERTIES:
+    :BEAMER_env: exampleblock
+    :END:
+    We want a data structure that allows
+    fast lookup using a key.
+
+    Key → Value
+
+    Student ID → Student
+** Next Course
+   Hash Tables implementation
+
+

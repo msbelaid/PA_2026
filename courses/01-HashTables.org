@@ -1,0 +1,827 @@
+#+TITLE: Hash Tables
+#+AUTHOR: Mohammed Said BELAID @@latex:\\@@ said.belaid@univ-usto.dz
+#+SUBTITLE: Search with a constant time
+#+DATE: 14/10/2026
+#+EMAIL: said.belaid@univ-usto.dz
+#+OPTIONS: H:2
+#+startup: beamer
+#+latex_header: \mode<beamer>{\usetheme{Antibes}}
+#+OPTIONS: listings:t
+#+LaTeX_CLASS: beamer
+#+LATEX_CLASS_OPTIONS: [aspectratio=169]
+#+LATEX_HEADER: \usepackage{listings}
+#+LATEX_HEADER: \usepackage{tikz}
+
+#+LATEX_HEADER: \lstset{
+#+LATEX_HEADER:   basicstyle=\ttfamily\scriptsize,
+#+LATEX_HEADER:   frame=single,
+#+LATEX_HEADER:   breaklines=true,
+#+LATEX_HEADER:   showstringspaces=false
+#+LATEX_HEADER: }
+#+LaTeX_HEADER: \logo{\includegraphics[height=1cm]{../images/usto.png}}
+#+LATEX_HEADER: \usepackage{xcolor}
+
+* Introduction: The search problem
+
+** Finding a student
+*** Example
+:PROPERTIES:
+:BEAMER_col: 0.4
+:BEAMER_env: column
+:END:
+|   ID | Name     | Grade |
+|------+----------+-------|
+| 1023 | Ahmed    |    14 |
+| 1045 | Mohammed |    16 |
+| 1087 | Lina     |    11 |
+| 1120 | Sara     |    15 |
+|      |          |       |
+
+*** Question
+:PROPERTIES:
+:BEAMER_col: 0.6
+:BEAMER_env: block
+:END:
+How can we quickly find the grade of student =1087=?
+
+\pause
+
+What if the list contains 100000 students?
+
+#+BEGIN_EXPORT latex
+\note{
+Start with the concrete task rather than the definition. 
+Ask students how they would solve it manually. Let them suggest scanning the list.
+The purpose is to establish the lookup problem and its cost.
+}
+#+END_EXPORT
+
+** Naive solution: Linear search
+#+begin_src java
+for (int i = 0; i < students.length; i++) {
+    if (students[i].id == targetId) {
+        return students[i].grade;
+    }
+}
+#+end_src
+
+- Check entries one by one.
+- In the worst case, inspect every entry.
+- Time complexity: $O(n)$.
+
+#+BEGIN_EXPORT latex
+\note{Explain that n is the number of entries. If the target is last, or absent, every entry may be inspected. Ask students what happens to the number of checks when the list doubles in size.}
+#+END_EXPORT
+
+** Better solution: Binary search
+- If entries are sorted by ID, compare with the middle entry.
+- Discard half of the remaining entries at each step.
+- Time complexity: $O(\log n)$.
+- For \(n = 1 000 000$ \rightarrow lg_2(n) \approx 20\)
+
+#+BEGIN_EXPORT latex
+\note{
+Binary search is a substantial improvement, but it requires sorted data and still performs comparisons.
+Ask: can we locate a value directly, without searching through the array?
+}
+#+END_EXPORT
+
+** Can we do better?
+#+ATTR_BEAMER: :overlay <+->
+- We want to look up a value using its key.
+- We would like the lookup to be fast.
+- Could we use the key to tell us where to look?
+
+#+BEGIN_EXPORT latex
+\note{
+Do not introduce the term hash table yet.
+Let students consider using the key as an array index.
+This creates the need for the next section.
+}
+#+END_EXPORT
+
+* Direct access
+
+** Use the Key as an Index
+#+begin_src java
+Students[1023] = New Student("AHMED", 14);
+Students[1045] = New Student("MOHAMED", 16);
+Students[1087] = New Student("LINA", 11);
+Students[1120] = New Student("SARA", 15);
+
+// .......
+
+System.out.println(Students[1087]);
+#+end_src
+
+- No search is needed.
+- Array access by index takes $O(1)$ time.
+
+#+BEGIN_EXPORT latex
+\note{
+Assume for this example that IDs are valid array indices from 0 to 1999.
+Point out that this is a strong assumption.
+Direct access is excellent when the key range is small and manageable.}
+#+END_EXPORT
+
+** The problem with Direct access
+*** Example
+:PROPERTIES:
+:BEAMER_col: 0.7
+:BEAMER_env: block
+:END:
+Suppose IDs are:
+- Big number: ~8 700 087~
+- UUID: ~5759456d-0ad2-4a3b-ba06-5bcac4f33481~
+- Passport ID: ~P<DZABENMOHAMED<<MOHAMED~
+  ~1234567891DZA8505204M2810243<<<28~
+- String: ~"Name"~
+- Any object type!
+
+*** Problems
+:PROPERTIES:
+:BEAMER_col: 0.3
+:BEAMER_env: alertblock
+:END:
+- A huge array may be required.
+- Most positions may remain unused.
+- Keys may not be integers.
+
+#+BEGIN_EXPORT latex
+\note{
+Stress that direct access is not inherently bad.
+It is unsuitable when the possible key space is much larger than the set of stored keys, 
+or when keys cannot naturally be array indices.
+}
+#+END_EXPORT
+
+** The Idea: calculate an index
+Instead of using the key directly, calculate an array index from it.
+
+
+\begin{array}{ccl}
+\text{Key} & \rightarrow & \text{Function} \rightarrow \text{Index} \\
+1087 & \rightarrow & f(1087) \rightarrow 7
+\end{array}
+
+\pause
+
+Can we map many possible keys to a small array?
+
+#+BEGIN_EXPORT latex
+\note{
+This is the conceptual bridge to hashing.
+Ask students to suggest simple calculations that transform a large integer into a small range.
+}
+#+END_EXPORT
+
+* From Direct access to Hashing
+
+** A first Hash function
+Suppose the array has 100 positions, indexed from 0 to 99.
+
+We can use:
+
+\[
+h(k) = k \bmod 10
+\]
+
+|  Key | Calculation  | Index |
+|------+--------------+-------|
+| 1023 | 1023 mod 100 |    23 |
+| 1045 | 1045 mod 100 |    45 |
+| 1087 | 1087 mod 100 |    87 |
+| 1120 | 1120 mod 100 |    20 |
+
+
+\pause
+Can we map many possible keys to a small array?
+\pause
+What would be the issue?
+\pause
+What if we have more than 100 students?
+\pause
+What if we have two students with 1023 and 2623 as IDs?
+ 
+#+BEGIN_EXPORT latex
+\note{
+Every integer key maps to an index between 0 and 99.
+Have students calculate h(1234), h(5678), and h(9999).
+}
+#+END_EXPORT
+
+** What Is a Hash Table?
+A **hash table** stores key-value pairs in an array.
+
+- A **key** identifies an entry.
+- A **value** is the data associated with that key.
+- A **hash function** helps determine where the entry should be stored.
+
+\(key \rightarrow hash function \rightarrow array index \rightarrow value\)
+
+#+BEGIN_EXPORT latex
+\note{
+Use the student ID as the key and the grade as the value.
+Emphasize that the function determines a candidate position; 
+it does not guarantee a unique position.
+That limitation leads to collisions.}
+#+END_EXPORT
+
+** Properties of a useful Hash function
+\pause
+- **Deterministic:** the same key gives the same result.
+- **Efficient:** calculating the result should be inexpensive.
+- **Valid index:** the final index must be within the table.
+- **Good distribution:** keys should spread reasonably across positions.
+
+#+BEGIN_EXPORT latex
+\note{Avoid claiming that a good hash function prevents all collisions. It aims to distribute keys well. If there are more possible keys than table positions, collisions cannot be avoided for every key.}
+#+END_EXPORT
+
+** Hash value and array index                                      :noexport:
+A hash value and an array index are related, but not always identical.
+
+- A hash function may produce an integer hash value.
+- The table maps that value to a valid array index.
+- The mapping depends on the table implementation and capacity.
+
+#+BEGIN_EXPORT latex
+\note{This distinction becomes useful later with Java hashCode(). Do not overcomplicate the first implementation: for integer keys, h(k) = k mod m is enough to explore the core idea.}
+#+END_EXPORT
+
+* The Collision problem
+
+** When two keys share an index
+Use the same function:
+
+\[
+h(k) = k \bmod 10
+\]
+
+| Key | Index |
+|-----+-------|
+| 12  | 2 |
+| 22  | 2 |
+| 32  | 2 |
+
+All three keys map to index 2.
+
+This is a **collision**.
+
+#+BEGIN_EXPORT latex
+\note{Ask students what would happen if insertion simply overwrote the value at index 2. The earlier entries would be lost. A hash table must have a collision-resolution strategy.}
+#+END_EXPORT
+
+** Can we avoid every Collision?
+- There may be millions of possible keys.
+- The array may have only a few hundred positions.
+- Multiple keys must therefore map to the same position.
+
+A better hash function can reduce collisions, but cannot eliminate them in general.
+
+#+BEGIN_EXPORT latex
+\note{This is an instance of the pigeonhole principle. Keep the explanation intuitive: if there are more objects than boxes, at least one box must contain more than one object.}
+#+END_EXPORT
+
+* Collision Resolution
+
+** Two Main Strategies
+*** Separate Chaining
+:PROPERTIES:
+:BEAMER_col: 0.48
+:BEAMER_env: block
+:END:
+Each array position stores a collection of entries.
+
+*** Open Addressing
+:PROPERTIES:
+:BEAMER_col: 0.48
+:BEAMER_env: block
+:END:
+All entries stay inside the array. If a position is occupied, try another.
+
+#+BEGIN_EXPORT latex
+\note{Introduce both strategies briefly, then teach each in detail. The key contrast is where colliding entries are stored: in a bucket collection or in another array slot.}
+#+END_EXPORT
+
+** Strategy 1: Separate Chaining
+Each position points to a list of entries.
+
+#+begin_src text
+Index
+  0
+  1
+  2  ---> [12] ---> [22] ---> [32]
+  3
+  4
+  ...
+#+end_src
+
+Keys 12, 22, and 32 all have hash index 2.
+
+#+BEGIN_EXPORT latex
+\note{This drawing uses a linked list to represent a bucket. The implementation could use another collection. Focus on the idea that one array index can represent multiple entries.}
+#+END_EXPORT
+
+** Inserting with Chaining
+For each key-value pair:
+1. Calculate the index.
+2. Access the list.
+3. Add the entry to that list.
+
+#+begin_src java
+int index = hash(key);
+lists[index].add(new Entry(key, value));
+#+end_src
+
+#+BEGIN_EXPORT latex
+\note{This is pseudocode: buckets[index] is assumed to be a collection. Discuss whether adding at the beginning or end of a linked list changes the insertion cost. Mention that duplicate keys require updating the existing value rather than creating a second mapping.}
+#+END_EXPORT
+
+** Searching with Chaining
+1. Calculate the index.
+2. Visit entries in that list.
+3. Compare keys until the matching entry is found.
+
+#+begin_src java
+int index = hash(key);
+for (Entry entry : buckets[index]) {
+    if (entry.key.equals(key)) {
+        return entry.value;
+    }
+}
+return null;
+#+end_src
+
+#+BEGIN_EXPORT latex
+\note{The hash function finds the bucket, not necessarily the exact entry. Equality comparison identifies the key. Under a good distribution, buckets remain short; in the worst case, all keys could land in one bucket.}
+#+END_EXPORT
+
+** Strategy 2: Open Addressing
+All entries are stored directly in the array.
+
+If the preferred position is occupied, probe other positions until:
+- an empty position is found, or
+- the desired key is found.
+
+#+BEGIN_EXPORT latex
+\note{Contrast this with chaining: no linked list is needed for collisions. The probing sequence must be consistent for insertion and lookup.}
+#+END_EXPORT
+
+** Linear probing
+Try consecutive positions after a collision.
+
+\[
+h_i(k) = (h(k) + i) \bmod m
+\]
+
+- $h(k)$: initial index
+- $i$: probe number, starting at 0
+- $m$: table size
+
+#+BEGIN_EXPORT latex
+\note{For i=0, we try the original hash index. For i=1, the next position; for i=2, the next one, wrapping around at the end of the array.}
+#+END_EXPORT
+
+** Linear probing: Step by Step
+Table size: 10
+
+\[
+h(k) = k \bmod 10
+\]
+
+Insert 12, 22, and 32.
+
+1. 12 → index 2 (empty)
+2. 22 → index 2 occupied; try index 3
+3. 32 → index 2 occupied; try 3, then 4
+
+#+BEGIN_EXPORT latex
+\note{Ask students to predict each position before revealing it. Have them trace the probe sequence aloud. The example deliberately makes all three keys have the same initial index.}
+#+END_EXPORT
+
+** Result of Linear Probing
+#+begin_src text
+Index:  0  1  2   3   4   5  6  7  8  9
+Value:  -  -  12  22  32  -  -  -  -  -
+#+end_src
+
+Searching for 32:
+- Check index 2: not 32.
+- Check index 3: not 32.
+- Check index 4: found 32.
+
+#+BEGIN_EXPORT latex
+\note{Searching must follow the same probe sequence used during insertion. Explain why the search cannot stop at index 2 just because the key is not there.}
+#+END_EXPORT
+
+** Deletion with Linear Probing
+Suppose the table contains 12, 22, and 32 at indices 2, 3, and 4.
+
+If we simply clear index 3, searching for 32 might stop at that empty slot and incorrectly report that 32 is absent.
+
+Solution: mark the slot as **deleted** (a tombstone), or use another carefully designed deletion strategy.
+
+#+BEGIN_EXPORT latex
+\note{This is a subtle but important implementation detail. Distinguish a slot that has never been used from one that was used and later deleted. In a simple teaching implementation, tombstones are a clear way to preserve the probe chain.}
+#+END_EXPORT
+
+** Chaining vs. Linear Probing
+| Property                  | Chaining                | Linear probing               |
+|---------------------------+-------------------------+------------------------------|
+| Storage                   | Bucket collections      | Array only                   |
+| Collisions                | Add to same bucket      | Search for another slot      |
+| Table can fill completely | Yes, with longer chains | No                           |
+| Main concern              | Long list               | Clustering                   |
+| Deletion                  | Remove from list        | Must preserve probe sequence |
+
+#+BEGIN_EXPORT latex
+\note{Use this slide to consolidate the contrast. Do not claim one strategy is always faster. Performance depends on the workload, load factor, memory behavior, and implementation details.}
+#+END_EXPORT
+
+* Implementing a Hash table
+
+** Implementation plan
+We will build a simplified hash table in stages:
+
+1. Choose a table representation.
+2. Calculate an index.
+3. Insert a key-value pair.
+4. Search for a key.
+5. Handle collisions.
+6. Delete entries.
+7. Resize when needed.
+
+#+BEGIN_EXPORT latex
+\note{Tell students that the goal is to understand the mechanism, not to reproduce every optimization of Java's HashMap. Start with integer keys and simple values so the algorithm remains visible.}
+#+END_EXPORT
+
+** A Simple Entry Class
+#+begin_src java
+class Entry {
+    int key;
+    String value;
+
+    Entry(int key, String value) {
+        this.key = key;
+        this.value = value;
+    }
+}
+#+end_src
+
+#+BEGIN_EXPORT latex
+\note{Explain that a map stores a relationship between a key and a value. This Entry class is intentionally minimal. In a generic implementation, both key and value types could be parameters.}
+#+END_EXPORT
+
+** Hash Function for Integer Keys
+#+begin_src java
+int hash(int key, int capacity) {
+    return key % capacity;
+}
+#+end_src
+
+- Produces an index from 0 to capacity - 1.
+- Works with negative integers as well.
+
+** Implementing Chaining: Structure
+#+begin_src java
+class HashTable {
+    private final List<Entry>[] buckets;
+
+    HashTable(int capacity) {
+        buckets = new List[capacity];
+        for (int i = 0; i < capacity; i++) {
+            buckets[i] = new ArrayList<>();
+        }
+    }
+}
+#+end_src
+
+#+BEGIN_EXPORT latex
+\note{This is an instructional sketch; a production-quality Java implementation should handle generic-array warnings and define a clear API. Explain that each array position owns a list of entries.}
+#+END_EXPORT
+
+** Implementing Chaining: Put
+#+begin_src java
+void put(int key, String value) {
+    int index = hash(key, buckets.length);
+
+    for (Entry entry : buckets[index]) {
+        if (entry.key == key) {
+            entry.value = value;
+            return;
+        }
+    }
+
+    buckets[index].add(new Entry(key, value));
+}
+#+end_src
+
+#+BEGIN_EXPORT latex
+\note{Emphasize the update case: a map normally has at most one value per key. If the key already exists, update its value. Only add a new entry when the key is absent.}
+#+END_EXPORT
+
+** Implementing Chaining: Get
+#+begin_src java
+String get(int key) {
+    int index = hash(key, buckets.length);
+
+    for (Entry entry : buckets[index]) {
+        if (entry.key == key) {
+            return entry.value;
+        }
+    }
+
+    return null;
+}
+#+end_src
+
+#+BEGIN_EXPORT latex
+\note{Discuss the meaning of null here and the ambiguity it can create if null values are allowed. A more complete API might provide containsKey or return an Optional. Keep this version simple for the algorithm exercise.}
+#+END_EXPORT
+
+** Test Collisions
+#+begin_src java
+HashTable grades = new HashTable(10);
+
+grades.put(12, "A");
+grades.put(22, "B");
+grades.put(32, "C");
+
+System.out.println(grades.get(12));
+System.out.println(grades.get(22));
+System.out.println(grades.get(32));
+#+end_src
+
+Expected output:
+#+begin_src text
+A
+B
+C
+#+end_src
+
+#+BEGIN_EXPORT latex
+\note{Ask students to predict the output and draw the bucket at index 2. This is a useful test because all three keys collide under the chosen hash function.}
+#+END_EXPORT
+
+** Implementation Exercise: Linear Probing
+Ask students to implement a second version using arrays.
+
+Required operations:
+- put(key, value)
+- get(key)
+- remove(key)
+- Handle collisions using linear probing.
+- Detect when the table is full.
+
+#+BEGIN_EXPORT latex
+\note{Give students time to design the probing loop. Ask them how the implementation distinguishes an unused slot, an occupied slot, and a deleted slot. They may represent slot state with a boolean array or an enum.}
+#+END_EXPORT
+
+* Improving Performance
+
+** The Load Factor
+The load factor measures how full a table is:
+
+\[
+\alpha = \frac{n}{m}
+\]
+
+- $n$: number of stored entries
+- $m$: number of table positions
+
+Example: 7 entries in a table of capacity 10 gives $\alpha=0.7$.
+
+#+BEGIN_EXPORT latex
+\note{For chaining, the load factor is the average number of entries per bucket. For open addressing, it is the fraction of occupied slots and strongly affects the chance of finding an empty position.}
+#+END_EXPORT
+
+** Resizing and Rehashing
+When the table becomes too full:
+1. Allocate a larger array.
+2. Recalculate positions for stored entries.
+3. Insert entries into the new table.
+
+Why recalculate positions?
+
+\[
+h(k) = k \bmod m
+\]
+
+Changing $m$ can change the index.
+
+#+BEGIN_EXPORT latex
+\note{For example, 22 mod 10 is 2, while 22 mod 20 is 2; but 23 mod 10 is 3 and 23 mod 20 is 3. Choose an example where the remainder changes, such as 32: 32 mod 10 = 2 and 32 mod 20 = 12. Rehashing is necessary because the table capacity is part of the index calculation.}
+#+END_EXPORT
+
+** Time Complexity
+| Operation | Average case | Worst case |
+|-----------+--------------+------------|
+| Search | $O(1)$ | $O(n)$ |
+| Insertion | $O(1)$ | $O(n)$ |
+| Deletion | $O(1)$ | $O(n)$ |
+
+Average-case performance depends on good distribution and a suitable load factor.
+
+#+BEGIN_EXPORT latex
+\note{Avoid saying hash-table operations are always O(1). Worst-case behavior can be linear. Resizing can make an individual insertion expensive, even though insertion is amortized constant time under common resizing strategies.}
+#+END_EXPORT
+
+* Hashing Strings and Objects
+
+** What If the Key Is a String?
+Examples:
+- "student-1023"
+- "sara@example.com"
+- "computer-science"
+
+A string hash function combines information from its characters to produce an integer hash value.
+
+#+BEGIN_EXPORT latex
+\note{There is no need to derive a sophisticated string hash in this lecture unless time permits. The important point is that arbitrary keys need a consistent way to produce hash values. Different strings can still have the same hash.}
+#+END_EXPORT
+
+** Java: hashCode() and equals()
+Java objects can provide:
+- =hashCode()= to produce an integer hash code.
+- =equals()= to determine whether two objects represent equal keys.
+
+Contract:
+
+If =a.equals(b)= is true, then =a.hashCode() == b.hashCode()= must also be true.
+
+The reverse is not required.
+
+#+BEGIN_EXPORT latex
+\note{Explain why the reverse is not required: hash codes have a finite range, while possible objects are effectively unlimited. Different objects can share a hash code. HashMap uses both hashing and equality checks.}
+#+END_EXPORT
+
+** A Common Mistake
+If a custom class overrides =equals()= but not =hashCode()=, equal objects may produce different hash codes.
+
+A hash-based collection may then fail to find an entry using an equal key.
+
+#+BEGIN_EXPORT latex
+\note{Use a Student class as an example. If students are considered equal by ID, hashCode should be based on that same ID. Mention that mutable fields used in hashing can also cause problems if changed after insertion.}
+#+END_EXPORT
+
+* Hash Tables in Programming Languages
+
+** Java HashMap
+#+begin_src java
+Map<Integer, String> grades = new HashMap<>();
+
+grades.put(1023, "14");
+grades.put(1045, "16");
+
+System.out.println(grades.get(1023));
+#+end_src
+
+- Stores key-value pairs.
+- Keys are unique.
+- Provides efficient average-case lookup.
+- Handles collisions and resizing internally.
+
+#+BEGIN_EXPORT latex
+\note{Connect this library example to the implementation students wrote. The purpose of building a simple version is to understand what the library takes care of, not to replace the standard library in real applications.}
+#+END_EXPORT
+
+** Java HashSet
+#+begin_src java
+Set<String> names = new HashSet<>();
+
+names.add("Ahmed");
+names.add("Sara");
+names.add("Ahmed");
+
+System.out.println(names.size()); // 2
+#+end_src
+
+A =HashSet= stores unique elements and is useful for membership tests and duplicate detection.
+
+#+BEGIN_EXPORT latex
+\note{Explain that HashSet is conceptually related to a hash map: it stores elements without an associated user-visible value. Duplicate additions do not create additional set elements.}
+#+END_EXPORT
+
+** What Other Languages Provide
+- Python: =dict= and =set=
+- JavaScript: =Map= and =Set=
+- C++: =std::unordered_map= and =std::unordered_set=
+- C#: =Dictionary<TKey, TValue>= and =HashSet<T>=
+
+#+BEGIN_EXPORT latex
+\note{Keep the comparison brief. The exact implementation details and guarantees differ by language. The shared idea is efficient lookup based on hashing and equality.}
+#+END_EXPORT
+
+* Applications and Trade-offs
+
+** Where Are Hash Tables Useful?
+- Find a student by ID.
+- Count word frequencies.
+- Detect duplicate values.
+- Cache previously computed results.
+- Track objects already processed.
+- Index records by a key.
+
+#+BEGIN_EXPORT latex
+\note{Ask students to suggest an application from software they use. For word frequency, a word is the key and its count is the value. For duplicate detection, a set may be sufficient.}
+#+END_EXPORT
+
+** Example: Counting Word Frequencies
+#+begin_src java
+Map<String, Integer> counts = new HashMap<>();
+
+for (String word : words) {
+    counts.put(word, counts.getOrDefault(word, 0) + 1);
+}
+#+end_src
+
+The word is the key; its frequency is the value.
+
+#+BEGIN_EXPORT latex
+\note{Walk through a short sequence such as ["red", "blue", "red"]. Show the map changing after each word. This connects hashing to a common algorithmic pattern.}
+#+END_EXPORT
+
+** When Is a Hash Table Not the Best Choice?
+- When keys must remain sorted.
+- When efficient range queries are required.
+- When memory is very limited.
+- When worst-case guarantees are essential and not provided by the chosen implementation.
+
+#+BEGIN_EXPORT latex
+\note{Use TreeMap as an example of a sorted map in Java. It is tree-based, not a hash-table variant. It offers different trade-offs, including sorted key traversal and logarithmic operations.}
+#+END_EXPORT
+
+* Other Map Implementations
+
+** Choosing a Map in Java
+| Type | Main characteristic |
+|------+---------------------|
+| =HashMap= | General-purpose key-value lookup |
+| =LinkedHashMap= | Predictable iteration order |
+| =TreeMap= | Sorted keys |
+| =ConcurrentHashMap= | Concurrent access support |
+
+#+BEGIN_EXPORT latex
+\note{Be precise: LinkedHashMap is hash-based and maintains a defined iteration order; TreeMap is based on a search tree, not hashing; ConcurrentHashMap is designed for concurrent use. Do not imply that these types are interchangeable in every situation.}
+#+END_EXPORT
+
+* Summary
+
+** The Central Idea
+- Direct access is fast but requires suitable indices.
+- Hashing maps keys to array positions.
+- Collisions are inevitable in general.
+- Chaining and open addressing resolve collisions differently.
+- Load factor and resizing affect performance.
+
+#+BEGIN_EXPORT latex
+\note{Ask students to explain the difference between a hash function and a collision-resolution strategy. This checks whether they understand that hashing finds a candidate position but does not uniquely identify an entry.}
+#+END_EXPORT
+
+** Key Takeaways
+- Average-case lookup, insertion, and deletion can be $O(1)$.
+- Worst-case operations can be $O(n)$.
+- Hash quality and load factor matter.
+- In Java, correct implementations of =equals()= and =hashCode()= are essential.
+- Use standard collections in real applications; understand the implementation to use them well.
+
+#+BEGIN_EXPORT latex
+\note{End by asking students to compare linear search, binary search, and hash-table lookup. A good answer should mention the assumptions and trade-offs, not just the complexity values.}
+#+END_EXPORT
+
+** Questions
+- Why are collisions unavoidable in general?
+- How does chaining differ from linear probing?
+- Why can deletion be tricky with open addressing?
+- Why does resizing require rehashing?
+- Why must equal Java objects have equal hash codes?
+
+#+BEGIN_EXPORT latex
+\note{These questions can be used for a short recap, oral discussion, or a written exit ticket. For a practical follow-up, ask students to trace insertions into a table of size 7 using h(k)=k mod 7 and linear probing.}
+#+END_EXPORT
+
+* Testing Tikz
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}
+  \foreach \i/\val/\col in {
+    0/12/gray!20,
+    1/25/gray!20,
+    2/18/red!25,
+    3/42/gray!20,
+    4/{}/green!25,
+    5/9/gray!20
+  } {
+    \draw[fill=\col] (\i,0) rectangle ++(1,0.7);
+    \ifx\val\empty
+    \else
+      \node at (\i+0.5,0.35) {\val};
+    \fi
+    \node at (\i+0.5,-0.25) {\small \i};
+  }
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+

@@ -1,0 +1,162 @@
+#+TITLE: TP 0 : Basics
+#+SUBTITLE: Checking the basics: loops, linked lists and searching
+#+AUTHOR: Mohammed Said BELAID @@latex:\\@@ said.belaid@univ-usto.dz
+#+DATE: 13/10/2026
+#+EMAIL: said.belaid@univ-usto.dz
+#+OPTIONS: toc:nil num:nil
+#+LaTeX_CLASS: article
+#+LATEX_CLASS_OPTIONS: [11pt,a4paper]
+#+LATEX_HEADER: \usepackage[margin=2cm]{geometry}
+#+LATEX_HEADER: \usepackage{lmodern}
+#+LATEX_HEADER: \usepackage{listings}
+#+LATEX_HEADER: \usepackage{xcolor}
+#+LATEX_HEADER: \usepackage{graphicx}
+#+LATEX_HEADER: \usepackage{fancyhdr}
+#+LATEX_HEADER: \pagestyle{fancy}
+#+LATEX_HEADER: \fancyhead[R]{\includegraphics[height=0.8cm]{../images/usto.png}}
+#+LATEX_HEADER: \setlength{\headheight}{24pt}
+#+LATEX_HEADER: \newcommand{\institutionheader}{%
+#+LATEX_HEADER:   \noindent
+#+LATEX_HEADER:   \begin{minipage}[c]{0.14\textwidth}\includegraphics[height=1.6cm]{../images/usto.png}\end{minipage}%
+#+LATEX_HEADER:   \begin{minipage}[c]{0.86\textwidth}\centering
+#+LATEX_HEADER:     {\bfseries University of Science and Technology of Oran -- Mohamed Boudiaf}\\[3pt]
+#+LATEX_HEADER:     Faculty of Mathematics and Informatics\\[1pt]
+#+LATEX_HEADER:     Department of Computer Science
+#+LATEX_HEADER:   \end{minipage}\par\vspace{6pt}\hrule}
+#+LATEX_HEADER: \makeatletter
+#+LATEX_HEADER: \renewcommand{\@maketitle}{%
+#+LATEX_HEADER:   \institutionheader\vskip 1.2em
+#+LATEX_HEADER:   \begin{center}
+#+LATEX_HEADER:     {\LARGE \@title \par}\vskip 1em
+#+LATEX_HEADER:     {\large \@author \par}\vskip 0.5em
+#+LATEX_HEADER:     {\large \@date}
+#+LATEX_HEADER:   \end{center}\par\vskip 1.5em}
+#+LATEX_HEADER: \makeatother
+
+#+LATEX_HEADER: % ---- Theme ----
+#+LATEX_HEADER: \usepackage[explicit]{titlesec}
+#+LATEX_HEADER: \usepackage[most]{tcolorbox}
+#+LATEX_HEADER: \usepackage{enumitem}
+#+LATEX_HEADER: % Colors taken from the USTO-MB logo
+#+LATEX_HEADER: \definecolor{ustonavy}{HTML}{323E4B}
+#+LATEX_HEADER: \definecolor{ustosteel}{HTML}{627788}
+#+LATEX_HEADER: \definecolor{ustotaupe}{HTML}{867B7C}
+#+LATEX_HEADER: \setlength{\parindent}{0pt}
+#+LATEX_HEADER: \setlength{\parskip}{5pt}
+#+LATEX_HEADER: \setlist{itemsep=1pt,topsep=2pt}
+#+LATEX_HEADER: \setlist[enumerate,1]{itemsep=6pt,topsep=4pt,label={\sffamily\bfseries\color{ustonavy}\arabic*.}}
+#+LATEX_HEADER: \renewcommand{\arraystretch}{1.4}
+#+LATEX_HEADER: \fancyhead[L]{\sffamily\small\color{ustonavy}Advanced Programming --- TP 0}
+#+LATEX_HEADER: \renewcommand{\headrule}{{\color{ustonavy}\hrule height 0.6pt}}
+#+LATEX_HEADER: % Exercises: full-width bar
+#+LATEX_HEADER: \titleformat{\section}[block]{\Large\sffamily\bfseries}{}{0pt}{%
+#+LATEX_HEADER:   \colorbox{ustonavy}{\parbox{\dimexpr\textwidth-2\fboxsep\relax}{\color{white}\strut #1}}}
+#+LATEX_HEADER: \titlespacing*{\section}{0pt}{14pt}{6pt}
+#+LATEX_HEADER: % Questions
+#+LATEX_HEADER: \titleformat{\subsection}[block]{\large\sffamily\bfseries\color{ustonavy}}{}{0pt}{#1}
+#+LATEX_HEADER: \titlespacing*{\subsection}{0pt}{12pt}{4pt}
+#+LATEX_HEADER: % Information boxes
+#+LATEX_HEADER: \tcbset{labbox/.style={enhanced, arc=2pt, boxrule=0.8pt, left=8pt, right=8pt,
+#+LATEX_HEADER:   fonttitle=\sffamily\bfseries, before skip=10pt, after skip=10pt}}
+#+LATEX_HEADER: \newtcolorbox{objectives}{labbox, colback=ustosteel!6, colframe=ustosteel, title=Objectives}
+#+LATEX_HEADER: \newtcolorbox{nextcourse}{labbox, colback=ustotaupe!7, colframe=ustotaupe, title=Toward the next course}
+
+#+LATEX_HEADER: \lstset{
+#+LATEX_HEADER:   basicstyle=\ttfamily\small,
+#+LATEX_HEADER:   keywordstyle=\color{blue!70!black}\bfseries,
+#+LATEX_HEADER:   commentstyle=\color{green!45!black}\itshape,
+#+LATEX_HEADER:   stringstyle=\color{red!65!black},
+#+LATEX_HEADER:   backgroundcolor=\color{gray!8},
+#+LATEX_HEADER:   frame=single,
+#+LATEX_HEADER:   rulecolor=\color{gray!50},
+#+LATEX_HEADER:   breaklines=true,
+#+LATEX_HEADER:   showstringspaces=false
+#+LATEX_HEADER: }
+
+#+BEGIN_objectives
+This first TP checks that you master the basics expected in this
+course:
+- writing loops and conditions,
+- implementing and modifying a simple data structure,
+- comparing several solutions to the same problem,
+- reasoning about time complexity.
+#+END_objectives
+
+* Exercise 1: FizzBuzz
+
+1. Write a program that prints the numbers from 1 to 100, with the
+   following rules:
+   - for multiples of 3, print =Fizz= instead of the number,
+   - for multiples of 5, print =Buzz= instead of the number,
+   - for multiples of both 3 and 5, print =FizzBuzz=.
+
+   Expected beginning of the output:
+   =1 2 Fizz 4 Buzz Fizz 7 8 Fizz Buzz 11 Fizz 13 14 FizzBuzz 16 ...=
+
+2. Write a function =fizzbuzz(n)= that prints the sequence from 1 to
+   =n=. The value of =n= is read from the user.
+
+3. We now add a new rule: for multiples of 7, print =Bazz=. A number
+   that is a multiple of several values combines the words in order
+   (21 → =FizzBazz=, 35 → =BuzzBazz=, 105 → =FizzBuzzBazz=).
+   - Modify your program to support this rule.
+
+* Exercise 2: Linked list
+
+1. Implement a singly linked list of integers. Each node contains a
+   value and a reference to the next node. The list must provide:
+
+   | Operation     | Description                                    |
+   |---------------+------------------------------------------------|
+   | =addFirst(x)= | insert =x= at the beginning of the list        |
+   | =addLast(x)=  | insert =x= at the end of the list              |
+   | =contains(x)= | return true if =x= is in the list              |
+   | =remove(x)=   | remove the first occurrence of =x=, if present |
+   | =print()=     | display the elements of the list               |
+
+   Test every operation, including on an empty list and on a list
+   with a single element.
+
+2. Add a method =size()= that returns the number of elements by
+   traversing the list.
+   - What is the time complexity of =size()=?
+   - A program calls =size()= after every insertion while building a
+     list of $n$ elements. What is the total cost?
+
+3. Modify your list so that =size()= runs in $O(1)$.
+   - Which operations must update it?
+   - Give the time complexity of each operation of your list.
+
+4. *(Bonus)* Make =addLast(x)= run in $O(1)$.
+
+* Exercise 3: Find the duplicate
+
+Given an array of $n$ integers, write a function =hasDuplicate(a)=
+that returns true if at least one value appears more than once, and
+false otherwise.
+
+#+BEGIN_EXAMPLE
+hasDuplicate([4, 1, 7, 3, 1, 9])  ->  true    (1 appears twice)
+hasDuplicate([4, 1, 7, 3, 8, 9])  ->  false
+hasDuplicate([])                  ->  false
+#+END_EXAMPLE
+
+1. *Naive solution.* Write a first version that compares every pair of
+   elements.
+   - What is its time complexity? Justify.
+   - How many comparisons are done in the worst case for $n = 10^6$?
+
+2. *A better solution.* Write a second version that is faster than
+   the naive one.
+
+   /Hint: in a sorted array, where are the copies of a value?/
+   - What is its time complexity?
+
+** Next course                                                     :noexport:
+#+BEGIN_nextcourse
+The naive solution runs in $O(n^2)$ and the second one in
+$O(n \log n)$. Can we detect a duplicate by reading the array only
+once, in $O(n)$?
+
+This is the subject of the next course: *Hash tables*.
+#+END_nextcourse
