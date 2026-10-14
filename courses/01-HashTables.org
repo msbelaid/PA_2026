@@ -1,5 +1,5 @@
 #+TITLE: Hash tables
-#+AUTHOR: Mohammed Said BELAID @@latex:\\@@ said.belaid@univ-usto.dz
+#+AUTHOR: Mohammed Said BELAID @@latex:\\@@ said.belaid@univ-usto.dz @@latex:\\ \href{https://github.com/msbelaid}{github.com/msbelaid}@@
 #+SUBTITLE: Searching in constant time
 #+DATE: 14/10/2026
 #+EMAIL: said.belaid@univ-usto.dz
@@ -29,7 +29,7 @@
 #+LATEX_HEADER:   }}
 
 #+LATEX_HEADER: \lstset{
-#+LATEX_HEADER:   basicstyle=\ttfamily\tiny,
+#+LATEX_HEADER:   basicstyle=\ttfamily\fontsize{5}{6}\selectfont,
 #+LATEX_HEADER:   keywordstyle=\color{blue!70!black}\bfseries,
 #+LATEX_HEADER:   commentstyle=\color{green!45!black}\itshape,
 #+LATEX_HEADER:   stringstyle=\color{red!65!black},
@@ -620,17 +620,30 @@ Keys are =int= (student IDs), values are =String= (names).
 #+END_EXPORT
 
 ** A simple entry class
+*** Code
+:PROPERTIES:
+:BEAMER_col: 0.64
+:END:
 #+begin_src java
 class Entry {
-    int key;
-    String value;
+    int key;      // (1)
+    String value; // (2)
 
-    Entry(int key, String value) {
+    Entry(int key, String value) { // (3)
         this.key = key;
         this.value = value;
     }
 }
 #+end_src
+
+*** Explanation
+:PROPERTIES:
+:BEAMER_col: 0.36
+:END:
+#+ATTR_BEAMER: :overlay <+->
+1. The key: the student ID used to find the entry.
+2. The value stored with it: the student's name.
+3. An entry is one (key, value) pair, one box in the drawings.
 
 #+BEGIN_EXPORT latex
 \note{Explain that a map stores a relationship between a key and a value. This Entry class is intentionally minimal. In a generic implementation, both key and value types could be parameters.}
@@ -648,7 +661,7 @@ class HashTable {
     HashTable(int capacity) {
         buckets = new LinkedList[capacity]; // (2)
         for (int i = 0; i < capacity; i++) {
-            buckets[i] = new LinkedList<>(); // (4)
+            buckets[i] = new LinkedList<>(); // (3)
         }
     }
 }
