@@ -1,0 +1,996 @@
+#+TITLE: Dynamic arrays
+#+AUTHOR: Mohammed Said BELAID @@latex:\\@@ said.belaid@univ-usto.dz @@latex:\\ \href{https://github.com/msbelaid}{github.com/msbelaid}@@
+#+SUBTITLE: Growing an array in amortized constant time
+#+DATE: 21/10/2026
+#+EMAIL: said.belaid@univ-usto.dz
+#+OPTIONS: H:2
+#+startup: beamer
+#+latex_header: \mode<beamer>{\usetheme{Antibes}}
+#+OPTIONS: listings:t
+#+LaTeX_CLASS: beamer
+#+LATEX_CLASS_OPTIONS: [aspectratio=169]
+#+LATEX_HEADER: \usepackage{listings}
+#+LATEX_HEADER: \usepackage{tikz}
+#+LATEX_HEADER: \usetikzlibrary{decorations.pathreplacing}
+#+LATEX_HEADER: \usepackage{pgfplots}
+#+LATEX_HEADER: \pgfplotsset{compat=1.16}
+#+LATEX_HEADER: \tikzset{onslide/.code args={<#1>#2}{\only<#1>{\pgfkeysalso{#2}}}}
+#+LATEX_HEADER: \tikzset{alt/.code args={<#1>#2#3}{\alt<#1>{\pgfkeysalso{#2}}{\pgfkeysalso{#3}}}}
+#+LATEX_HEADER: \tikzset{invisible/.style={opacity=0}, visible on/.style={alt={#1{}{invisible}}}}
+#+LATEX_HEADER: \tikzset{coin/.style={circle, draw=orange!70!black, fill=yellow!70!orange, inner sep=0pt, minimum size=0.2cm}}
+#+LATEX_HEADER: % \cells{cell width}{y}{last index}: empty cells, with their index below
+#+LATEX_HEADER: \newcommand{\cells}[3]{\foreach \i in {0,...,#3} {\draw[fill=gray!8] (\i*#1,#2) rectangle ++(#1,0.6); \node[font=\tiny, gray] at (\i*#1+#1/2,#2-0.15) {\i};}}
+#+LATEX_HEADER: % \vals[fill]{cell width}{y}{index/value list}: filled cells
+#+LATEX_HEADER: \newcommand{\vals}[4][structure!15]{\foreach \i/\v in {#4} {\draw[fill=#1] (\i*#2,#3) rectangle ++(#2,0.6); \node[font=\tiny] at (\i*#2+#2/2,#3+0.3) {\v};}}
+#+LATEX_HEADER: % \vbuckets{x}{first label}: 10 hash-table buckets, drawn vertically
+#+LATEX_HEADER: \newcommand{\vbuckets}[2]{\foreach \i in {0,...,9} {\draw[fill=gray!8] (#1,-\i*0.42) rectangle ++(0.45,0.34); \pgfmathtruncatemacro\lab{\i+#2} \node[anchor=east, font=\tiny] at (#1-0.03,-\i*0.42+0.17) {\lab};}}
+#+LATEX_HEADER: % \vchain[fill]{x}{row}{keys}: the chain of a bucket drawn by \vbuckets
+#+LATEX_HEADER: \newcommand{\vchain}[4][structure!15]{\fill (#2+0.225,-#3*0.42+0.17) circle (1pt); \draw (#2+0.225,-#3*0.42+0.17) -- (#2+0.45,-#3*0.42+0.17);
+#+LATEX_HEADER:   \foreach \k [count=\c] in {#4} {\pgfmathsetmacro\xx{#2+0.7+(\c-1)*0.95}
+#+LATEX_HEADER:     \node[draw, fill=#1, font=\tiny, inner sep=1pt, minimum width=0.7cm, minimum height=0.3cm, anchor=west] at (\xx,-#3*0.42+0.17) {\k};
+#+LATEX_HEADER:     \draw[->, >=stealth] (\xx-0.25,-#3*0.42+0.17) -- (\xx,-#3*0.42+0.17);}}
+#+LATEX_HEADER: % \trow{first slide}{operation}{size}{capacity}{copies}: a row revealed from that slide
+#+LATEX_HEADER: \newcommand{\trow}[5]{\uncover<#1->{#2} & \uncover<#1->{#3} & \uncover<#1->{#4} & \uncover<#1->{#5}}
+
+#+LATEX_HEADER: \lstset{
+#+LATEX_HEADER:   basicstyle=\ttfamily\fontsize{5}{6}\selectfont,
+#+LATEX_HEADER:   keywordstyle=\color{blue!70!black}\bfseries,
+#+LATEX_HEADER:   commentstyle=\color{green!45!black}\itshape,
+#+LATEX_HEADER:   stringstyle=\color{red!65!black},
+#+LATEX_HEADER:   backgroundcolor=\color{gray!8},
+#+LATEX_HEADER:   frame=single,
+#+LATEX_HEADER:   rulecolor=\color{gray!50},
+#+LATEX_HEADER:   breaklines=true,
+#+LATEX_HEADER:   showstringspaces=false
+#+LATEX_HEADER: }
+#+LaTeX_HEADER: \logo{\includegraphics[height=1cm]{../images/usto.png}}
+#+LATEX_HEADER: \usepackage{xcolor}
+#+LATEX_HEADER: \AtBeginSection[]{\begin{frame}<beamer>{Outline}\tableofcontents[currentsection]\end{frame}}
+
+
+* The problem: a fixed-size array
+
+** Back to the open question
+At the end of the Hash Tables course:
+
+#+ATTR_BEAMER: :overlay <+->
+- Our table has 10 slots and holds 10 students. Where does the 11th go?
+- Answer: allocate a *larger array* and move the entries.
+- But how much larger? And what does it cost?
+
+\pause
+The same question arises for *any* array: today we answer it on the simplest case,
+a list of students.
+
+#+BEGIN_EXPORT latex
+\note{Start from the answers students gave at the end of the last course. Most will have proposed a bigger array. Today we study that idea carefully: the size of the new array matters a lot, and the analysis needs a new tool, amortized analysis. We come back to hash tables at the end of the course.}
+#+END_EXPORT
+
+** Arrays have a fixed size
+#+begin_src java
+String[] students = new String[4];
+
+students[0] = "Sara";
+students[1] = "Ahmed";
+students[2] = "Mohammed";
+students[3] = "Lina";
+students[4] = "Yacine"; // ArrayIndexOutOfBoundsException
+#+end_src
+
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[>=stealth]
+  \cells{1.3}{0}{3}
+  \vals{1.3}{0}{0/Sara, 1/Ahmed, 2/Mohammed, 3/Lina}
+  \node[draw, fill=green!25, font=\tiny, minimum width=1.3cm, minimum height=0.6cm] (y) at (7.2,0.3) {Yacine};
+  \draw[->, thick, red] (y) -- (5.3,0.3);
+  \node[red, font=\scriptsize\bfseries] at (7.2,0.85) {no room!};
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+- The size is chosen at creation and cannot change.
+- Students register one at a time: how many will come?
+
+#+BEGIN_EXPORT latex
+\note{In Java, C and most languages, an array is a contiguous block of memory: its length is fixed when it is allocated, because the next bytes may already be used by something else. Ask students how they would choose the size: too small and we fail, too large and we waste memory.}
+#+END_EXPORT
+
+** Why not a linked list?
+| Operation           | Array                   | Linked list              |
+|---------------------+-------------------------+--------------------------|
+| Access by index     | $O(1)$                  | $O(n)$                   |
+| Append at the end   | $O(1)$, if room is left | $O(1)$ (with a tail)     |
+| Memory              | Contiguous cells        | One node + pointer each  |
+| Cache behaviour     | Excellent               | Poor (scattered nodes)   |
+
+\pause
+We want both:
+- the *index access* and contiguous memory of an array,
+- the *unlimited growth* of a linked list.
+
+#+BEGIN_EXPORT latex
+\note{Recall the complexity review of the introduction: "append in O(1)" had the footnote "if capacity allows". Linked lists from TP0 grow freely, but reaching element i means walking i nodes, and every node is a separate allocation. Contiguous memory is also faster in practice: the processor loads neighbouring cells into the cache together.}
+#+END_EXPORT
+
+** The goal: a dynamic array
+A *dynamic array* is a list backed by an array, which grows when needed.
+
+| Operation          | Meaning                              |
+|--------------------+--------------------------------------|
+| =get(i)=, =set(i, v)= | read or replace the element at index $i$ |
+| =add(v)=           | append $v$ at the end                |
+| =add(i, v)=        | insert $v$ at index $i$              |
+| =remove(i)=        | remove the element at index $i$      |
+| =size()=           | number of elements                   |
+
+\pause
+You already use it: =ArrayList= in Java, =list= in Python, =std::vector= in C++.
+
+#+BEGIN_EXPORT latex
+\note{Insist that this is one of the most used data structures in everyday programming: most "lists" students have written in Python are dynamic arrays. Understanding it explains when these operations are fast and when they are not.}
+#+END_EXPORT
+
+* Size and capacity
+
+** Size vs. capacity
+Idea: allocate *more cells than needed*.
+
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[>=stealth]
+  \cells{1.3}{0}{7}
+  \vals{1.3}{0}{0/Sara, 1/Ahmed, 2/Mohammed, 3/Lina, 4/Yacine}
+  \draw[decorate, decoration={brace, amplitude=5pt}, thick] (0,0.7) -- (6.5,0.7)
+       node[midway, above=5pt, font=\small] {size $= 5$};
+  \draw[decorate, decoration={brace, amplitude=5pt, mirror}, thick] (0,-0.35) -- (10.4,-0.35)
+       node[midway, below=5pt, font=\small] {capacity $= 8$};
+  \node[font=\scriptsize, gray, align=center] at (8.45,1.0) {free cells};
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+- *Capacity:* number of allocated cells (=data.length=).
+- *Size:* number of elements actually stored.
+- Always: $0 \leq \text{size} \leq \text{capacity}$.
+
+The free cells are invisible to the user: =get(6)= is an error.
+
+#+BEGIN_EXPORT latex
+\note{This distinction is the whole trick. The user only sees the first size cells; the remaining cells are reserved space for future appends. Ask: what is the size and the capacity of a new, empty list?}
+#+END_EXPORT
+
+** Appending when there is room
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[>=stealth]
+  \cells{1.3}{0}{3}
+  \vals{1.3}{0}{0/Sara, 1/Ahmed, 2/Mohammed}
+  \draw[fill=gray!8, onslide=<2->{fill=orange!45}, onslide=<3->{fill=green!25}] (3*1.3,0) rectangle ++(1.3,0.6);
+  \node[font=\tiny, visible on=<3->] at (3*1.3+0.65,0.3) {Lina};
+  \node[font=\scriptsize, gray] at (3*1.3+0.65,-0.15) {3};
+\end{tikzpicture}
+\end{center}
+
+\uncover<2->{\alert<2>{\texttt{add("Lina")}: size $= 3 <$ capacity $= 4$: there is room at index \texttt{size}.}}
+
+\uncover<3->{\alert<3>{Write \texttt{data[3] = "Lina"}, then \texttt{size = 4}.}}
+
+\uncover<4->{\alert<4>{Cost: one write, $O(1)$.}}
+
+\note{The next free cell is always at index size: no search is needed. This is the cheap, common case.}
+#+END_EXPORT
+
+** Appending when the array is full
+#+BEGIN_EXPORT latex
+\begin{columns}[T]
+\begin{column}{0.66\textwidth}
+\begin{tikzpicture}[>=stealth]
+  % old array
+  \begin{scope}[onslide=<6->{opacity=0.3}]
+    \cells{1.2}{0}{3}
+    \vals{1.2}{0}{0/Sara, 1/Ahmed, 2/Mohammed, 3/Lina}
+  \end{scope}
+  \node[red, font=\scriptsize\bfseries, anchor=west, visible on=<6->] at (4.9,0.3) {garbage};
+  \node[draw, fill=green!25, font=\tiny, minimum width=1.2cm, minimum height=0.6cm, visible on=<2-4>] at (6.7,0.3) {Yacine};
+  % new array
+  \begin{scope}[visible on=<3->]
+    \cells{1.2}{-1.6}{7}
+  \end{scope}
+  \begin{scope}[visible on=<4->]
+    \vals{1.2}{-1.6}{0/Sara, 1/Ahmed, 2/Mohammed, 3/Lina}
+  \end{scope}
+  \foreach \i in {0,...,3} {\draw[->, thick, red, visible on=<4>] (\i*1.2+0.6,-0.05) -- (\i*1.2+0.6,-0.95);}
+  \begin{scope}[visible on=<5->]
+    \vals[green!25]{1.2}{-1.6}{4/Yacine}
+  \end{scope}
+\end{tikzpicture}
+\end{column}
+\begin{column}{0.32\textwidth}
+\small
+\uncover<2->{\alert<2>{\texttt{add("Yacine")}: full}}
+
+\medskip
+\uncover<3->{\alert<3>{\textbf{1.} Allocate a new, bigger array}}
+
+\medskip
+\uncover<4->{\alert<4>{\textbf{2.} Copy the 4 elements}}
+
+\medskip
+\uncover<5->{\alert<5>{\textbf{3.} Write Yacine at index 4}}
+
+\medskip
+\uncover<6->{\alert<6>{\textbf{4.} Drop the old array\\
+  \quad (garbage collector)}}
+
+\medskip
+\uncover<7->{\alert<7>{Cost: 4 copies + 1 write\\
+  \quad $O(n)$}}
+\end{column}
+\end{columns}
+\note{This is the expensive, rare case. The cost of the resize is proportional to the number of elements copied. The question for the rest of the course: how big should the new array be? Here we chose 8; why not 5, or 1000?}
+#+END_EXPORT
+
+* Growth strategies
+
+** How much bigger?
+Each resize copies all the elements: $O(n)$.
+
+Two natural choices for the new capacity:
+- *Strategy A:* add a constant: capacity $+ c$ (e.g. $+4$).
+- *Strategy B:* multiply by a factor: capacity $\times 2$.
+
+\pause
+Let us count the copies for $n$ appends, starting from capacity 4.
+
+#+BEGIN_EXPORT latex
+\note{Let students vote before computing. Many will prefer +1 or +4 because it wastes no memory. The writes themselves always cost n in total: only the copies differ between strategies.}
+#+END_EXPORT
+
+** Strategy A: add a constant
+Capacity: 4, 8, 12, 16, ... A resize happens every 4 appends.
+
+#+BEGIN_EXPORT latex
+\[
+\text{copies} = 4 + 8 + 12 + \dots + (n-4)
+             = 4\,(1 + 2 + \dots + k)
+             \approx \frac{n^2}{8}
+\quad \text{with } k \approx \frac{n}{4}
+\]
+#+END_EXPORT
+
+\pause
+- In general, with $+c$: about $\dfrac{n^2}{2c}$ copies: $O(n^2)$ for $n$ appends.
+- A bigger $c$ only divides by a constant, and wastes more memory.
+- Per append: $O(n)$ on average. As slow as inserting into a sorted array!
+
+#+BEGIN_EXPORT latex
+\note{The sum 1 + 2 + ... + k = k(k+1)/2 is the same as for the naive duplicate search of TP0. With c = 1, every single append copies the whole array.}
+#+END_EXPORT
+
+** Strategy B: double the capacity
+Capacity: 4, 8, 16, 32, ... Resizes get *rarer and rarer*.
+
+#+BEGIN_EXPORT latex
+\[
+\text{copies} = 4 + 8 + 16 + \dots + 2^j
+\quad \text{with } 2^j < n
+\]
+#+END_EXPORT
+
+\pause
+A geometric sum: each term is larger than all the previous ones together.
+
+#+BEGIN_EXPORT latex
+\[
+4 + 8 + \dots + 2^j = 2^{j+1} - 4 < 2 \cdot 2^j < 2n
+\]
+#+END_EXPORT
+
+\pause
+- Fewer than $2n$ copies for $n$ appends: $O(n)$ in total.
+- Per append: $O(1)$ on average!
+
+#+BEGIN_EXPORT latex
+\note{The key fact: the last resize copies at most n elements, and all the previous resizes together copied fewer than that. Draw the sum as blocks on the board: 4 + 8 + 16 < 32.}
+#+END_EXPORT
+
+** Comparing the two strategies
+Total number of copies for $n$ appends, starting from capacity 4:
+
+| $n$          | $+4$                       | $\times 2$       |
+|--------------+----------------------------+------------------|
+| 16           | 24                         | 12               |
+| 1 024        | 130 560                    | 1 020            |
+| 1 000 000    | 124 999 500 000            | 1 048 572        |
+
+\pause
+At $\approx 10^9$ copies per second: *2 minutes* vs. *1 millisecond*.
+
+#+BEGIN_EXPORT latex
+\note{These are exact counts. Make students feel the difference: the constant strategy is not a little slower, it is in a different complexity class. Bridge: "O(1) on average per append" is a new kind of average; let us make it precise.}
+#+END_EXPORT
+
+* Amortized analysis
+
+** The cost of each append
+Cost of append $\#i$ (writes + copies), doubling from capacity 4:
+
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}
+\begin{axis}[
+    width=12cm, height=4.6cm,
+    ybar, bar width=4pt,
+    xmin=0, xmax=34, ymin=0, ymax=35,
+    xlabel={append number $i$}, ylabel={cost},
+    xtick={1,5,9,17,33}, ytick={1,3,5,9,17,33},
+    tick label style={font=\tiny}, label style={font=\scriptsize},
+    legend style={font=\tiny, at={(0.02,0.97)}, anchor=north west},
+    legend cell align=left]
+  \addplot[fill=structure!60, draw=structure] coordinates {
+    (1,1) (2,1) (3,1) (4,1) (5,5) (6,1) (7,1) (8,1) (9,9) (10,1) (11,1) (12,1)
+    (13,1) (14,1) (15,1) (16,1) (17,17) (18,1) (19,1) (20,1) (21,1) (22,1) (23,1)
+    (24,1) (25,1) (26,1) (27,1) (28,1) (29,1) (30,1) (31,1) (32,1) (33,33)};
+  \addlegendentry{cost of append $i$}
+  \addplot[sharp plot, thick, orange!80!black, mark=none, visible on=<2->] coordinates {
+    (1,1) (2,1) (3,1) (4,1) (5,1.8) (6,1.67) (7,1.57) (8,1.5) (9,2.33) (10,2.2) (11,2.09)
+    (12,2) (13,1.92) (14,1.86) (15,1.8) (16,1.75) (17,2.65) (18,2.56) (19,2.47) (20,2.4)
+    (21,2.33) (22,2.27) (23,2.22) (24,2.17) (25,2.12) (26,2.08) (27,2.04) (28,2) (29,1.97)
+    (30,1.93) (31,1.9) (32,1.88) (33,2.82)};
+  \addlegendentry{average cost so far}
+  \addplot[sharp plot, dashed, red, mark=none, visible on=<3->] coordinates {(0,3) (34,3)};
+  \addlegendentry{bound: 3}
+\end{axis}
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+- Most appends cost 1; the expensive ones are rare and get further apart.
+- @@beamer:\uncover<2->{@@The average cost never exceeds 3.@@beamer:}@@
+
+#+BEGIN_EXPORT latex
+\note{Read the chart with the students: append 5 copies 4 elements and writes 1, append 9 copies 8, append 17 copies 16, append 33 copies 32. Each spike is twice as high as the previous one but twice as far away: they pay for each other. The orange line is the total cost so far divided by i.}
+#+END_EXPORT
+
+** The aggregate method
+Total cost of $n$ appends:
+
+#+BEGIN_EXPORT latex
+\[
+T(n) = \underbrace{n}_{\text{writes}} + \underbrace{4 + 8 + \dots + 2^j}_{\text{copies} \,<\, 2n} < 3n
+\qquad \Rightarrow \qquad \frac{T(n)}{n} < 3
+\]
+#+END_EXPORT
+
+#+BEGIN_EXPORT latex
+\begin{block}{Amortized cost}
+The \emph{amortized cost} of an operation is the total cost of a worst-case
+sequence of $n$ operations, divided by $n$.
+\end{block}
+#+END_EXPORT
+
+\pause
+Append in a doubling array: $O(1)$ amortized.
+
+#+BEGIN_EXPORT latex
+\note{This is the aggregate method: bound the total cost of the whole sequence, then divide. The word comes from finance: a large expense is amortized (spread) over a long period. The sequence starts from an empty array; the result holds for every n.}
+#+END_EXPORT
+
+** Amortized, average, worst case
+| Kind of bound    | What is averaged?                  | Example                  |
+|------------------+------------------------------------+--------------------------|
+| Worst case       | nothing: the single worst operation | append: $O(n)$           |
+| Average case     | over the inputs (or hash values)    | hash table get: $O(1)$   |
+| Amortized        | over a sequence of operations       | append: $O(1)$           |
+
+\pause
+- The hash-table $O(1)$ assumes a good hash function: bad keys break it.
+- The amortized $O(1)$ is a *guarantee*: it holds for *any* sequence. No probability.
+
+#+BEGIN_EXPORT latex
+\note{This distinction is often confused. Ask: can an adversary choose inputs that make appends slow on average? No: whatever the sequence, n appends cost less than 3n. For hash tables, an adversary who knows h can send keys that all land in one bucket.}
+#+END_EXPORT
+
+** The coins picture
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[>=stealth]
+  \cells{1.2}{0}{7}
+  \vals{1.2}{0}{0/Sara, 1/Ahmed, 2/Mohammed, 3/Lina}
+  \begin{scope}[visible on=<2->] \vals[green!25]{1.2}{0}{4/Yacine} \end{scope}
+  \begin{scope}[visible on=<3->] \vals[green!25]{1.2}{0}{5/Amina} \end{scope}
+  \begin{scope}[visible on=<4->] \vals[green!25]{1.2}{0}{6/Karim} \end{scope}
+  \begin{scope}[visible on=<5->] \vals[green!25]{1.2}{0}{7/Nour} \end{scope}
+  % one coin on the new element, one on an old element
+  \foreach \i/\s in {4/2, 5/3, 6/4, 7/5} {
+    \node[coin, visible on=<\s-5>] at (\i*1.2+0.6,0.9) {};
+    \node[coin, visible on=<\s-5>] at (\i*1.2-4.2,0.9) {};
+  }
+  % after the resize
+  \begin{scope}[visible on=<6->]
+    \cells{0.8}{-1.4}{15}
+    \vals{0.8}{-1.4}{0/Sara, 1/Ahmed, 2/Moh., 3/Lina, 4/Yacine, 5/Amina, 6/Karim, 7/Nour}
+    \vals[green!25]{0.8}{-1.4}{8/Rania}
+  \end{scope}
+\end{tikzpicture}
+\end{center}
+
+\small
+\uncover<1->{\alert<1>{Just after a resize: capacity 8, half full, no coins saved.}}
+
+\uncover<2->{\alert<2-4>{Each append pays 3 coins: 1 for its write, 1 saved on itself, 1 saved on an old element.}}
+
+\uncover<5->{\alert<5>{The array is full: every element holds exactly 1 coin.}}
+
+\uncover<6->{\alert<6>{Append Rania: 8 copies, paid by the 8 coins. Back to 0 coins, half full.}}
+
+\note{This is the accounting method, used here as an intuition. Cheap operations are overcharged and the surplus is saved for the expensive ones. The account never goes negative, so the real total cost is at most 3 coins per append. Each round is the same story at twice the scale.}
+#+END_EXPORT
+
+** Why adding a constant fails
+With capacity $+c$:
+- After a resize, only $c$ appends happen before the next one.
+- The next resize copies $n$ elements.
+- To pay for it, each of the $c$ appends must save $\dfrac{n}{c}$ coins.
+
+\pause
+The price grows with $n$: no constant number of coins is enough.
+
+\pause
+With doubling, $m/2$ appends separate two resizes, and the next resize copies $m$ elements: 2 coins per append always suffice.
+
+#+BEGIN_EXPORT latex
+\note{Same picture, different conclusion. The point of doubling is that the time between two resizes grows as fast as the cost of a resize. Any factor greater than 1 has this property, with a different constant: we discuss this in practice at the end.}
+#+END_EXPORT
+
+** A single append can still be slow
+- Amortized $O(1)$ does *not* mean that every append is $O(1)$:
+  append $\#(2^k+1)$ copies $2^k$ elements.
+- A problem for latency-sensitive programs: games, real-time systems,
+  user interfaces.
+
+\pause
+If the final size is known, *reserve* the capacity upfront:
+
+#+begin_src java
+List<String> students = new ArrayList<>(100000); // no resize until 100000
+#+end_src
+
+#+BEGIN_EXPORT latex
+\note{An amortized bound speaks about the total, not about each operation. A frame of a game that triggers a big copy may stutter. Reserving the capacity removes every resize. To go further: a third technique, the potential method, gives the same results more formally (CLRS, chapter "Amortized Analysis").}
+#+END_EXPORT
+
+* Implementing a dynamic array
+
+** Implementation plan
+1. Structure: an array and a size.
+2. =get=, =set=: check the index against the *size*.
+3. =add=: grow by doubling when full.
+4. =add(i, v)=, =remove(i)=: shift the elements.
+5. Test with our students.
+
+Elements are =String= (student names).
+
+#+BEGIN_EXPORT latex
+\note{Same approach as the hash table: understand the mechanism with a simple element type, not reproduce every detail of ArrayList. A generic version DynamicArray<T> works the same way.}
+#+END_EXPORT
+
+** Structure
+*** Code
+:PROPERTIES:
+:BEAMER_col: 0.64
+:END:
+#+begin_src java
+class DynamicArray {
+    private String[] data; // (1)
+    private int size;      // (2)
+
+    DynamicArray() {
+        data = new String[4]; // (3)
+        size = 0;
+    }
+
+    int size()     { return size; }
+    int capacity() { return data.length; } // (4)
+}
+#+end_src
+
+*** Explanation
+:PROPERTIES:
+:BEAMER_col: 0.36
+:END:
+#+ATTR_BEAMER: :overlay <+->
+1. The cells: occupied and free.
+2. The number of elements.
+3. Initial capacity: 4, as in the drawings.
+4. The capacity is the length of the array.
+
+#+BEGIN_EXPORT latex
+\note{Two fields are enough. The capacity does not need its own field: data.length already stores it.}
+#+END_EXPORT
+
+** get and set
+*** Code
+:PROPERTIES:
+:BEAMER_col: 0.64
+:END:
+#+begin_src java
+String get(int index) {
+    checkIndex(index);
+    return data[index];
+}
+
+void set(int index, String value) {
+    checkIndex(index);
+    data[index] = value; // (1)
+}
+
+private void checkIndex(int index) {
+    if (index < 0 || index >= size) { // (2)
+        throw new IndexOutOfBoundsException(
+            "Index " + index + ", size " + size);
+    }
+}
+#+end_src
+
+*** Explanation
+:PROPERTIES:
+:BEAMER_col: 0.36
+:END:
+#+ATTR_BEAMER: :overlay <+->
+1. Direct array access: $O(1)$.
+2. Compare with =size=, not =data.length=: the free cells are not elements.
+
+#+BEGIN_EXPORT latex
+\note{Ask: with size 5 and capacity 8, data[6] exists in memory. Why must get(6) fail? Because it does not contain an element of the list, only leftover or null data. set replaces an existing element; it never adds one.}
+#+END_EXPORT
+
+** add and grow
+*** Code
+:PROPERTIES:
+:BEAMER_col: 0.64
+:END:
+#+begin_src java
+void add(String value) {
+    if (size == data.length) { // (1)
+        grow();
+    }
+    data[size] = value; // (2)
+    size++;
+}
+
+private void grow() {
+    String[] bigger = new String[2 * data.length]; // (3)
+    for (int i = 0; i < size; i++) {
+        bigger[i] = data[i]; // (4)
+    }
+    data = bigger; // (5)
+}
+#+end_src
+
+*** Explanation
+:PROPERTIES:
+:BEAMER_col: 0.36
+:END:
+#+ATTR_BEAMER: :overlay <+->
+1. Full: make room first.
+2. The next free cell is at index =size=.
+3. Double the capacity.
+4. Copy the elements: $O(n)$.
+5. The old array is now garbage.
+
+#+BEGIN_EXPORT latex
+\note{Link each line to the animation of the full array. The loop in grow can be replaced by data = Arrays.copyOf(data, 2 * data.length). Edge case: if the initial capacity were 0, doubling would give 0 again; ArrayList handles this case separately.}
+#+END_EXPORT
+
+** Inserting in the middle: shifting
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[>=stealth]
+  \cells{1.3}{0}{7}
+  \vals{1.3}{0}{0/Sara}
+  \draw[fill=structure!15, onslide=<5->{fill=green!25}] (1*1.3,0) rectangle ++(1.3,0.6);
+  \node[font=\tiny] at (1*1.3+0.65,0.3) {\alt<5->{Yacine}{Ahmed}};
+  \draw[fill=structure!15, onslide=<4>{fill=orange!45}] (2*1.3,0) rectangle ++(1.3,0.6);
+  \node[font=\tiny] at (2*1.3+0.65,0.3) {\alt<4->{Ahmed}{Mohammed}};
+  \draw[fill=structure!15, onslide=<3>{fill=orange!45}] (3*1.3,0) rectangle ++(1.3,0.6);
+  \node[font=\tiny] at (3*1.3+0.65,0.3) {\alt<3->{Mohammed}{Lina}};
+  \draw[fill=gray!8, onslide=<2>{fill=orange!45}, onslide=<3->{fill=structure!15}] (4*1.3,0) rectangle ++(1.3,0.6);
+  \node[font=\tiny, visible on=<2->] at (4*1.3+0.65,0.3) {Lina};
+  \draw[->, thick, red, visible on=<2>] (3*1.3+0.65,0.65) to[bend left=50] (4*1.3+0.65,0.65);
+  \draw[->, thick, red, visible on=<3>] (2*1.3+0.65,0.65) to[bend left=50] (3*1.3+0.65,0.65);
+  \draw[->, thick, red, visible on=<4>] (1*1.3+0.65,0.65) to[bend left=50] (2*1.3+0.65,0.65);
+\end{tikzpicture}
+\end{center}
+
+\small
+\uncover<1->{\alert<1>{\texttt{add(1, "Yacine")}: index 1 is occupied by Ahmed.}}
+
+\uncover<2->{\alert<2-4>{Shift every element from index 1 one cell to the right, \emph{starting from the end}.}}
+
+\uncover<5->{\alert<5>{Write Yacine at index 1; size $= 5$.}}
+
+\uncover<6->{\alert<6>{Cost: $\text{size} - i$ moves, $O(n)$. Inserting at index 0 moves everything.}}
+
+\note{Ask why the shift starts from the end. Going from left to right, copying Ahmed into cell 2 would overwrite Mohammed before he is moved. Removing is the mirror image: shift to the left, starting from the removed index.}
+#+END_EXPORT
+
+** add(index, value) and remove(index)
+*** Code
+:PROPERTIES:
+:BEAMER_col: 0.64
+:END:
+#+begin_src java
+void add(int index, String value) {
+    if (index < 0 || index > size) { // (1)
+        throw new IndexOutOfBoundsException();
+    }
+    if (size == data.length) {
+        grow();
+    }
+    for (int i = size; i > index; i--) {
+        data[i] = data[i - 1]; // (2)
+    }
+    data[index] = value;
+    size++;
+}
+
+String remove(int index) {
+    checkIndex(index);
+    String removed = data[index];
+    for (int i = index; i < size - 1; i++) {
+        data[i] = data[i + 1]; // (3)
+    }
+    size--;
+    data[size] = null; // (4)
+    return removed;
+}
+#+end_src
+
+*** Explanation
+:PROPERTIES:
+:BEAMER_col: 0.36
+:END:
+#+ATTR_BEAMER: :overlay <+->
+1. =index == size= is allowed: it appends.
+2. Shift right, from the end.
+3. Shift left, from the removed index.
+4. Clear the last cell, so the garbage collector can free the object.
+
+#+BEGIN_EXPORT latex
+\note{Point 4 is easy to forget: without it, the array keeps a reference to an element that is no longer in the list (a memory leak in a garbage-collected language). Removing the last element moves nothing: O(1).}
+#+END_EXPORT
+
+** Test with the students
+*** Code
+:PROPERTIES:
+:BEAMER_col: 0.66
+:END:
+#+begin_src java
+DynamicArray students = new DynamicArray();
+
+students.add("Sara");
+students.add("Ahmed");
+students.add("Mohammed");
+students.add("Lina");
+System.out.println(students.size() + " / " + students.capacity());
+
+students.add("Yacine"); // full: grow
+System.out.println(students.size() + " / " + students.capacity());
+
+students.add(1, "Amina");
+System.out.println(students.get(1));
+System.out.println(students.get(2));
+
+students.remove(0);
+System.out.println(students.get(0));
+System.out.println(students.size() + " / " + students.capacity());
+#+end_src
+
+*** Output
+:PROPERTIES:
+:BEAMER_col: 0.32
+:END:
+#+ATTR_BEAMER: :overlay <2->
+Expected output:
+#+begin_example
+4 / 4
+5 / 8
+Amina
+Ahmed
+Amina
+5 / 8
+#+end_example
+
+#+BEGIN_EXPORT latex
+\note{Ask students to predict the output and to draw the array after each call. Notice the last line: after the removal, the capacity stays 8. Our array grows, but it never shrinks. Bridge to the shrinking section.}
+#+END_EXPORT
+
+** Cost of the operations
+| Operation           | Cost                                      |
+|---------------------+-------------------------------------------|
+| =get(i)=, =set(i, v)= | $O(1)$                                  |
+| =add(v)=            | $O(1)$ amortized, $O(n)$ worst case       |
+| =add(i, v)=         | $O(n)$: shifting                          |
+| =remove(i)=         | $O(n)$: shifting                          |
+| remove the last     | $O(1)$                                    |
+
+#+BEGIN_EXPORT latex
+\note{A dynamic array is excellent at the end and at random access, poor at the front and in the middle. That is why a stack is often implemented with a dynamic array (push and pop at the end), and why a queue needs another trick (a circular buffer).}
+#+END_EXPORT
+
+* Shrinking
+
+** Wasted memory
+#+begin_src java
+for (int i = 0; i < 1000; i++) students.add("Student " + i);
+for (int i = 0; i < 990; i++)  students.remove(students.size() - 1);
+#+end_src
+
+- Size: 10, capacity: 1024. 99% of the cells are wasted.
+
+\pause
+Idea: *halve* the capacity when the array becomes sparse.
+
+\pause
+When exactly? The natural answer, "when it is half full", is a trap.
+
+#+BEGIN_EXPORT latex
+\note{Removing from the end is O(1), so this loop is fast; but the memory is never returned. Shrinking means allocating a smaller array and copying: O(n), like growing. Ask students to propose a threshold before the next slide.}
+#+END_EXPORT
+
+** First idea: shrink when half full
+Grow $\times 2$ when full, shrink $\div 2$ when size $=$ capacity $/2$. Start: full, size $=$ capacity $= 4$.
+
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tabular}{llll}
+\textbf{Operation} & \textbf{Size} & \textbf{Capacity} & \textbf{Copies} \\ \hline
+\trow{2}{add: full, grow}       {5}{8}{4} \\
+\trow{3}{remove: half, shrink}  {4}{4}{4} \\
+\trow{4}{add: full, grow}       {5}{8}{4} \\
+\trow{5}{remove: half, shrink}  {4}{4}{4} \\
+\trow{6}{\dots}{}{}{}
+\end{tabular}
+\end{center}
+#+END_EXPORT
+
+@@beamer:\uncover<7->{@@Every operation copies $n$ elements: $O(n)$ each. This is *thrashing*.@@beamer:}@@
+
+#+BEGIN_EXPORT latex
+\note{With the coins: right after a grow, the array is exactly half full and the account is empty. A single remove then triggers a shrink, with no coins saved to pay for it. The sequence add, remove, add, remove is realistic: think of a stack whose size oscillates around a power of two.}
+#+END_EXPORT
+
+** Solution: shrink when a quarter full
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[>=stealth, font=\small]
+  \draw[thick] (0,0) -- (10,0);
+  \foreach \x/\l in {0/0, 2.5/{$m/4$}, 5/{$m/2$}, 10/{$m$}} {
+    \draw[thick] (\x,-0.15) -- (\x,0.15);
+    \node[below=3pt] at (\x,-0.1) {\l};
+  }
+  \node[font=\scriptsize, gray, anchor=west] at (10.3,0) {size};
+  \fill[structure] (5,0) circle (3pt);
+  \node[structure, font=\scriptsize] at (5,-0.95) {after a resize};
+  \draw[->, thick, red] (4.8,0.45) -- (2.6,0.45) node[midway, above, font=\scriptsize] {$\geq m/4$ removes};
+  \draw[->, thick, green!50!black] (5.2,0.45) -- (9.9,0.45) node[midway, above, font=\scriptsize] {$\geq m/2$ adds};
+  \node[red, font=\scriptsize\bfseries, align=center] at (2.5,1.25) {shrink $\div 2$};
+  \node[green!50!black, font=\scriptsize\bfseries] at (10,1.25) {grow $\times 2$};
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+- Grow $\times 2$ when full; shrink $\div 2$ when size $=$ capacity $/4$.
+- After *any* resize, the array is exactly half full.
+- At least $m/4$ operations happen before the next resize: they save enough coins.
+
+\pause
+\(\Rightarrow\) $O(1)$ amortized for *any* sequence of adds and removes.
+
+#+BEGIN_EXPORT latex
+\note{Check both cases with the students. Growing a full array of m elements gives capacity 2m with m elements: half full. Shrinking at m/4 elements gives capacity m/2 with m/4 elements: half full again. The gap between the two thresholds is what prevents thrashing.}
+#+END_EXPORT
+
+** Exercise: shrinking
+Modify =remove(index)= so that the array shrinks:
+- halve the capacity when size $=$ capacity $/ 4$,
+- never go below a minimum capacity of 4.
+
+Test it: add 1000 students, remove 990 of them, then print the size and the capacity.
+
+#+BEGIN_EXPORT latex
+\note{Expected: size 10, capacity 32. After 1000 adds the capacity is 1024; halvings happen at sizes 256 (to 512), 128 (to 256), 64 (to 128), 32 (to 64) and 16 (to 32). At size 10 the next threshold, 8, has not been reached. Ask students to write a private shrink method, similar to grow.}
+#+END_EXPORT
+
+* Back to hash tables: rehashing
+
+** The table is too full
+Hash tables have the same problem: the load factor $\alpha = n/m$ grows.
+
+- Java's =HashMap= doubles its number of buckets when $\alpha > 0.75$.
+- Same idea as the dynamic array: grow by a *factor*.
+
+\pause
+Can we simply copy the buckets into a bigger array?
+
+#+BEGIN_EXPORT latex
+\note{The open question of the last course is now half answered: we grow by doubling. Before revealing the next slide, ask students what changes when m changes: the hash function h(k) = k mod m itself.}
+#+END_EXPORT
+
+** Copying is not enough
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[>=stealth, scale=0.9, transform shape]
+  \node[font=\small\bfseries] at (1.2,0.8) {$m = 10$};
+  \vbuckets{0}{0}
+  \vchain{0}{0}{1120, 1030}
+  \vchain{0}{3}{1023, 1153}
+  \vchain{0}{5}{1045}
+  \vchain{0}{7}{1087, 2087}
+  \begin{scope}[visible on=<2->]
+    \node[font=\small\bfseries] at (6.3,0.8) {$m = 20$};
+    \vbuckets{4.5}{0}
+    \vbuckets{8.5}{10}
+    \draw[fill=gray!8, onslide=<2>{fill=red!25, draw=red, very thick}] (8.5,0) rectangle ++(0.45,0.34);
+  \end{scope}
+  \begin{scope}[visible on=<2>]
+    \vchain{4.5}{0}{1120, 1030}
+    \vchain{4.5}{3}{1023, 1153}
+    \vchain{4.5}{5}{1045}
+    \vchain{4.5}{7}{1087, 2087}
+    \node[red, font=\scriptsize\bfseries, anchor=west] at (9.1,0.17) {get(1030): empty!};
+  \end{scope}
+  \begin{scope}[visible on=<3->]
+    \vchain{4.5}{0}{1120}
+    \vchain[green!25]{8.5}{0}{1030}
+    \vchain{4.5}{3}{1023}
+    \vchain[green!25]{8.5}{3}{1153}
+    \vchain{4.5}{5}{1045}
+    \vchain{4.5}{7}{1087, 2087}
+  \end{scope}
+\end{tikzpicture}
+\end{center}
+
+\small
+\uncover<2->{\alert<2>{Naive copy: \texttt{get(1030)} computes $1030 \bmod 20 = 10$; bucket 10 is empty: \texttt{null}!}}
+
+\uncover<3->{\alert<3>{\emph{Rehashing}: re-insert every entry with the new $h(k) = k \bmod 20$.}}
+\note{Two new students, Karim (1030) and Nour (1153), were added to make the example visible. The index depends on m, so changing m moves entries. Observe: each chain of bucket i splits between buckets i and i+10, which is why Java can rehash cheaply with capacities that are powers of two.}
+#+END_EXPORT
+
+** The cost of rehashing
+- Rehashing re-inserts all $n$ entries: $O(n)$, like copying an array.
+- It happens when $\alpha$ crosses the threshold, and $m$ doubles each time.
+- Same aggregate argument: =put= is $O(1)$ amortized (and on average, for a good hash function).
+
+\pause
+| Language | Initial buckets | Resize when        | Growth   |
+|----------+-----------------+--------------------+----------|
+| Java =HashMap= | 16        | $\alpha > 0.75$    | $\times 2$ |
+| Python =dict=  | 8         | $\alpha > 2/3$     | $\times 2$ or more |
+
+#+BEGIN_EXPORT latex
+\note{For chaining, the threshold keeps the chains short. For open addressing, it is vital: probe sequences explode as alpha approaches 1, and the table can never exceed alpha = 1. Python uses open addressing, hence its lower threshold. Mention that a resize can make one put slow, exactly as for appends.}
+#+END_EXPORT
+
+* Dynamic arrays in practice
+
+** Java ArrayList
+#+begin_src java
+List<String> students = new ArrayList<>();
+students.add("Sara");          // append: O(1) amortized
+students.add(0, "Ahmed");      // insert at the front: O(n)
+students.get(1);               // Sara
+students.remove(0);            // O(n)
+
+ArrayList<String> big = new ArrayList<>(100000); // reserve the capacity
+big.ensureCapacity(200000);    // grow once, now
+big.trimToSize();              // capacity = size
+#+end_src
+
+- Grows by $\times 1.5$: =newCapacity = old + (old >> 1)=.
+- Never shrinks by itself: call =trimToSize()=.
+
+#+BEGIN_EXPORT latex
+\note{The default capacity is 10, allocated at the first add. Careful with List<Integer>: remove(0) removes the element at index 0, while remove(Integer.valueOf(0)) removes the value 0. ArrayList trades memory for simplicity by never shrinking automatically.}
+#+END_EXPORT
+
+** Python list and C++ vector
+*** Python
+:PROPERTIES:
+:BEAMER_col: 0.48
+:BEAMER_env: block
+:END:
+#+begin_src python
+students = []                    # list
+students.append("Sara")          # O(1) amortized
+students.insert(0, "Ahmed")      # O(n)
+students.pop()                   # last: O(1)
+students.pop(0)                  # first: O(n)
+
+import sys
+sys.getsizeof(students)  # grows in steps
+#+end_src
+
+*** C++
+:PROPERTIES:
+:BEAMER_col: 0.48
+:BEAMER_env: block
+:END:
+#+begin_src C++
+std::vector<std::string> students;
+students.reserve(100);           // capacity >= 100
+students.push_back("Sara");      // O(1) amortized
+students.size();                 // 1
+students.capacity();             // 100
+students.pop_back();             // O(1)
+students.shrink_to_fit();        // request
+#+end_src
+
+*** Notes                                                    :B_ignoreheading:
+:PROPERTIES:
+:BEAMER_env: ignoreheading
+:END:
+- Python grows by $\approx \times 1.125$; C++: $\times 2$ (GCC), $\times 1.5$ (MSVC).
+
+#+BEGIN_EXPORT latex
+\note{Students can observe the growth themselves: append in a loop and print sys.getsizeof each time it changes, or print capacity() in C++. To remove from the front efficiently in Python, use collections.deque. The growth factor is an implementation choice, not part of the language: it can change between versions.}
+#+END_EXPORT
+
+** Choosing the growth factor
+Any factor $r > 1$ gives $O(1)$ amortized. The constant changes:
+
+| Factor $r$ | Copies per append (amortized) | Wasted cells after a resize |
+|------------+-------------------------------+-----------------------------|
+| 2          | $\leq 1$                      | up to 50%                   |
+| 1.5        | $\leq 2$                      | up to 33%                   |
+| 1.125      | $\leq 8$                      | up to 11%                   |
+
+\pause
+A trade-off between *time* (fewer copies) and *memory* (fewer free cells).
+
+#+BEGIN_EXPORT latex
+\note{With factor r, the copies form the geometric sum n/r + n/r^2 + ... = n/(r - 1). Right after a resize, a fraction (r - 1)/r of the cells is free. Python favours memory because programs often hold many small lists; C++ libraries differ. There is no universally best factor.}
+#+END_EXPORT
+
+** Dynamic array vs. linked list
+| Operation                | Dynamic array       | Linked list            |
+|--------------------------+---------------------+------------------------|
+| Access by index          | $O(1)$              | $O(n)$                 |
+| Append at the end        | $O(1)$ amortized    | $O(1)$                 |
+| Insert at the front      | $O(n)$              | $O(1)$                 |
+| Insert after a known node | $O(n)$             | $O(1)$                 |
+| Extra memory             | Free cells          | One pointer per element |
+| Cache behaviour          | Excellent           | Poor                   |
+
+#+BEGIN_EXPORT latex
+\note{In practice, ArrayList is the default choice in Java, and LinkedList is rarely faster even for insertions, because walking to the insertion point is slow and cache misses dominate. Choose a linked list when you really insert or remove at known positions (or at the front) very often.}
+#+END_EXPORT
+
+* Summary
+
+** Key takeaways
+- A dynamic array separates *size* and *capacity*.
+- Growing copies everything, $O(n)$: grow by a *factor*, never by a constant.
+- Doubling makes append $O(1)$ *amortized*: a guarantee over any sequence.
+- Shrink at $1/4$, not $1/2$, to avoid thrashing.
+- Hash tables grow the same way: rehashing re-inserts every entry.
+- In practice: reserve the capacity when the size is known.
+
+#+BEGIN_EXPORT latex
+\note{Ask students to explain the difference between amortized and average cost in their own words. A good answer: average is over the inputs and can fail on bad inputs; amortized is over a sequence and always holds.}
+#+END_EXPORT
+
+** Open question: searching by prefix
+A hash table holds all the words of a dictionary.
+
+#+ATTR_BEAMER: :overlay <+->
+- =get("algorithm")=: $O(1)$ on average. Perfect.
+- Autocomplete: find all the words starting with ="algo"=.
+- Where are these words in the table? Is a hash table still a good choice?
+
+#+BEGIN_EXPORT latex
+\note{Let students answer: a good hash function scatters similar keys on purpose, so words sharing a prefix land in unrelated buckets, and we must scan the whole table: O(n). Sorting the words would help (binary search on the prefix). Do not give the answer: this is the starting point of the next course, tries.}
+#+END_EXPORT

@@ -30,12 +30,14 @@ complexity analysis.
 |----|-------------------------------------------|------------|--------------------------------------------------------------------------------------------------------------------|------------------------------------------------|
 | 00 | Introduction to Advanced Programming      | 30/09/2026 | [View](courses/00-Intro.pdf) · [Download](https://github.com/msbelaid/PA_2026/raw/main/courses/00-Intro.pdf)       | [Org](courses/00-Intro.org)                    |
 | 01 | Hash Tables: search in constant time      | 14/10/2026 | [View](courses/01-HashTables.pdf) · [Download](https://github.com/msbelaid/PA_2026/raw/main/courses/01-HashTables.pdf) | [Org](courses/01-HashTables.org)           |
+| 02 | Dynamic Arrays: growing in amortized O(1) | 21/10/2026 | [View](courses/02-DynamicArrays.pdf) · [Download](https://github.com/msbelaid/PA_2026/raw/main/courses/02-DynamicArrays.pdf) | [Org](courses/02-DynamicArrays.org)        |
 
 ## Labs (TP)
 
 | #   | Lab                                                     | Date       | Handout (PDF)                                                                                  | Source                  |
 |-----|---------------------------------------------------------|------------|------------------------------------------------------------------------------------------------|-------------------------|
 | TP0 | Basics: loops, linked lists and searching               | 13/10/2026 | [View](labs/TP0.pdf) · [Download](https://github.com/msbelaid/PA_2026/raw/main/labs/TP0.pdf)   | [Org](labs/TP0.org)     |
+| TP1 | Hash tables: direct access, hash sets and hash maps     | 20/10/2026 | [View](labs/TP1.pdf) · [Download](https://github.com/msbelaid/PA_2026/raw/main/labs/TP1.pdf)   | [Org](labs/TP1.org)     |
 
 In the labs, you may use any programming language you know.
 

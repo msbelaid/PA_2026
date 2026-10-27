@@ -1,0 +1,133 @@
+#+TITLE: TP 1 : Hash Tables
+#+SUBTITLE: Direct access, hash sets and hash maps
+#+AUTHOR: Mohammed Said BELAID @@latex:\\@@ said.belaid@univ-usto.dz
+#+DATE: 20/10/2026
+#+EMAIL: said.belaid@univ-usto.dz
+#+OPTIONS: toc:nil num:nil
+#+LaTeX_CLASS: article
+#+LATEX_CLASS_OPTIONS: [11pt,a4paper]
+#+LATEX_HEADER: \usepackage[margin=2cm]{geometry}
+#+LATEX_HEADER: \usepackage{lmodern}
+#+LATEX_HEADER: \usepackage{listings}
+#+LATEX_HEADER: \usepackage{xcolor}
+#+LATEX_HEADER: \usepackage{graphicx}
+#+LATEX_HEADER: \usepackage{fancyhdr}
+#+LATEX_HEADER: \pagestyle{fancy}
+#+LATEX_HEADER: \fancyhead[R]{\includegraphics[height=0.8cm]{../images/usto.png}}
+#+LATEX_HEADER: \setlength{\headheight}{24pt}
+#+LATEX_HEADER: \newcommand{\institutionheader}{%
+#+LATEX_HEADER:   \noindent
+#+LATEX_HEADER:   \begin{minipage}[c]{0.14\textwidth}\includegraphics[height=1.6cm]{../images/usto.png}\end{minipage}%
+#+LATEX_HEADER:   \begin{minipage}[c]{0.86\textwidth}\centering
+#+LATEX_HEADER:     {\bfseries University of Science and Technology of Oran -- Mohamed Boudiaf}\\[3pt]
+#+LATEX_HEADER:     Faculty of Mathematics and Informatics\\[1pt]
+#+LATEX_HEADER:     Department of Computer Science
+#+LATEX_HEADER:   \end{minipage}\par\vspace{6pt}\hrule}
+#+LATEX_HEADER: \makeatletter
+#+LATEX_HEADER: \renewcommand{\@maketitle}{%
+#+LATEX_HEADER:   \institutionheader\vskip 1.2em
+#+LATEX_HEADER:   \begin{center}
+#+LATEX_HEADER:     {\LARGE \@title \par}\vskip 1em
+#+LATEX_HEADER:     {\large \@author \par}\vskip 0.5em
+#+LATEX_HEADER:     {\large \@date}
+#+LATEX_HEADER:   \end{center}\par\vskip 1.5em}
+#+LATEX_HEADER: \makeatother
+
+#+LATEX_HEADER: % ---- Theme ----
+#+LATEX_HEADER: \usepackage[explicit]{titlesec}
+#+LATEX_HEADER: \usepackage[most]{tcolorbox}
+#+LATEX_HEADER: \usepackage{enumitem}
+#+LATEX_HEADER: % Colors taken from the USTO-MB logo
+#+LATEX_HEADER: \definecolor{ustonavy}{HTML}{323E4B}
+#+LATEX_HEADER: \definecolor{ustosteel}{HTML}{627788}
+#+LATEX_HEADER: \definecolor{ustotaupe}{HTML}{867B7C}
+#+LATEX_HEADER: \setlength{\parindent}{0pt}
+#+LATEX_HEADER: \setlength{\parskip}{5pt}
+#+LATEX_HEADER: \setlist{itemsep=1pt,topsep=2pt}
+#+LATEX_HEADER: \setlist[enumerate,1]{itemsep=6pt,topsep=4pt,label={\sffamily\bfseries\color{ustonavy}\arabic*.}}
+#+LATEX_HEADER: \renewcommand{\arraystretch}{1.4}
+#+LATEX_HEADER: \fancyhead[L]{\sffamily\small\color{ustonavy}Advanced Programming --- TP 1}
+#+LATEX_HEADER: \renewcommand{\headrule}{{\color{ustonavy}\hrule height 0.6pt}}
+#+LATEX_HEADER: % Exercises: full-width bar
+#+LATEX_HEADER: \titleformat{\section}[block]{\Large\sffamily\bfseries}{}{0pt}{%
+#+LATEX_HEADER:   \colorbox{ustonavy}{\parbox{\dimexpr\textwidth-2\fboxsep\relax}{\color{white}\strut #1}}}
+#+LATEX_HEADER: \titlespacing*{\section}{0pt}{14pt}{6pt}
+#+LATEX_HEADER: % Questions
+#+LATEX_HEADER: \titleformat{\subsection}[block]{\large\sffamily\bfseries\color{ustonavy}}{}{0pt}{#1}
+#+LATEX_HEADER: \titlespacing*{\subsection}{0pt}{12pt}{4pt}
+#+LATEX_HEADER: % Information boxes
+#+LATEX_HEADER: \tcbset{labbox/.style={enhanced, arc=2pt, boxrule=0.8pt, left=8pt, right=8pt,
+#+LATEX_HEADER:   fonttitle=\sffamily\bfseries, before skip=10pt, after skip=10pt}}
+#+LATEX_HEADER: \newtcolorbox{objectives}{labbox, colback=ustosteel!6, colframe=ustosteel, title=Objectives}
+#+LATEX_HEADER: \newtcolorbox{nextcourse}{labbox, colback=ustotaupe!7, colframe=ustotaupe, title=Toward the next course}
+
+#+LATEX_HEADER: \lstset{
+#+LATEX_HEADER:   basicstyle=\ttfamily\small,
+#+LATEX_HEADER:   keywordstyle=\color{blue!70!black}\bfseries,
+#+LATEX_HEADER:   commentstyle=\color{green!45!black}\itshape,
+#+LATEX_HEADER:   stringstyle=\color{red!65!black},
+#+LATEX_HEADER:   backgroundcolor=\color{gray!8},
+#+LATEX_HEADER:   frame=single,
+#+LATEX_HEADER:   rulecolor=\color{gray!50},
+#+LATEX_HEADER:   breaklines=true,
+#+LATEX_HEADER:   showstringspaces=false
+#+LATEX_HEADER: }
+
+
+#+BEGIN_objectives
+- Implement a simple hash table.
+- Use hash tables in practical examples.
+- Replace an $O(n^2)$ search by an $O(n)$ one.
+#+END_objectives
+
+* Exercise 1: Anagrams
+
+Two words are *anagrams* if they contain the same letters, the same
+number of times.
+
+#+BEGIN_EXAMPLE
+isAnagram("listen", "silent")  ->  true
+isAnagram("hello", "world")    ->  false
+#+END_EXAMPLE
+
+1. *Naive solution.* For each letter of =a=, find an identical letter
+   of =b= not used yet. Write =isAnagram(a, b)=. What is its complexity?
+
+2. *Direct access.* Count the letters of each word in an array of 26
+   counters (index =c - 'a'=), then compare the arrays. What is the
+   complexity?
+
+3. We now accept any ASCII character (codes 0 to 127). How large must
+   the direct-access array be? Instead, implement a small hash table of
+   32 buckets with $h(c) = c \bmod 32$ and chaining, with the operations
+   =increment(c)= and =get(c)=. Rewrite =isAnagram= with it.
+
+4. We now count the *words* of a text. Why is direct access no longer
+   possible? Write =wordCounts(words)= with a hash map.
+
+* Exercise 2: Find the duplicate
+
+Rewrite =hasDuplicate(a)= from TP0 with a hash set. Compare it with your
+TP0 versions (time and memory).
+
+* Exercise 3: Fill a knapsack with two objects
+
+A knapsack has a capacity $C$, and object $i$ has a weight =w[i]=. Find
+*two* objects that fill the knapsack *exactly*: =w[i] + w[j] = C=.
+
+#+BEGIN_EXAMPLE
+twoObjects([3, 8, 5, 11, 2], 13)  ->  1 and 2
+twoObjects([5, 2, 9], 10)         ->  none
+twoObjects([5, 2, 5], 10)         ->  0 and 2
+#+END_EXAMPLE
+
+1. *Naive solution.* Test every pair. What is its complexity?
+
+2. *A better solution.* How can we do better? Write it and give its
+   complexity.
+
+* Exercise 4: A phone book
+
+We want a phone book where a contact can be found by name *and* by phone
+number, both in $O(1)$ on average. Implement =add(name, phone)=,
+=findByName(name)=, =findByPhone(phone)= and =remove(name)=.
