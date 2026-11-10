@@ -38,6 +38,7 @@ complexity analysis.
 |-----|---------------------------------------------------------|------------|------------------------------------------------------------------------------------------------|-------------------------|
 | TP0 | Basics: loops, linked lists and searching               | 13/10/2026 | [View](labs/TP0.pdf) · [Download](https://github.com/msbelaid/PA_2026/raw/main/labs/TP0.pdf)   | [Org](labs/TP0.org)     |
 | TP1 | Hash tables: direct access, hash sets and hash maps     | 20/10/2026 | [View](labs/TP1.pdf) · [Download](https://github.com/msbelaid/PA_2026/raw/main/labs/TP1.pdf)   | [Org](labs/TP1.org)     |
+| TP2 | Tries and Bloom filters: phone numbers                  | 10/11/2026 | [View](labs/TP2.pdf) · [Download](https://github.com/msbelaid/PA_2026/raw/main/labs/TP2.pdf)   | [Org](labs/TP2.org)     |
 
 In the labs, you may use any programming language you know.
 

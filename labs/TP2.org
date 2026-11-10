@@ -1,0 +1,133 @@
+#+TITLE: TP 2 : Tries and Bloom Filters
+#+SUBTITLE: Phone numbers: prefixes and spam calls
+#+AUTHOR: Mohammed Said BELAID @@latex:\\@@ said.belaid@univ-usto.dz
+#+DATE: 10/11/2026
+#+EMAIL: said.belaid@univ-usto.dz
+#+OPTIONS: toc:nil num:nil
+#+LaTeX_CLASS: article
+#+LATEX_CLASS_OPTIONS: [11pt,a4paper]
+#+LATEX_HEADER: \usepackage[margin=2cm]{geometry}
+#+LATEX_HEADER: \usepackage{lmodern}
+#+LATEX_HEADER: \usepackage{listings}
+#+LATEX_HEADER: \usepackage{xcolor}
+#+LATEX_HEADER: \usepackage{graphicx}
+#+LATEX_HEADER: \usepackage{fancyhdr}
+#+LATEX_HEADER: \pagestyle{fancy}
+#+LATEX_HEADER: \fancyhead[R]{\includegraphics[height=0.8cm]{../images/usto.png}}
+#+LATEX_HEADER: \setlength{\headheight}{24pt}
+#+LATEX_HEADER: \newcommand{\institutionheader}{%
+#+LATEX_HEADER:   \noindent
+#+LATEX_HEADER:   \begin{minipage}[c]{0.14\textwidth}\includegraphics[height=1.6cm]{../images/usto.png}\end{minipage}%
+#+LATEX_HEADER:   \begin{minipage}[c]{0.86\textwidth}\centering
+#+LATEX_HEADER:     {\bfseries University of Science and Technology of Oran -- Mohamed Boudiaf}\\[3pt]
+#+LATEX_HEADER:     Faculty of Mathematics and Informatics\\[1pt]
+#+LATEX_HEADER:     Department of Computer Science
+#+LATEX_HEADER:   \end{minipage}\par\vspace{6pt}\hrule}
+#+LATEX_HEADER: \makeatletter
+#+LATEX_HEADER: \renewcommand{\@maketitle}{%
+#+LATEX_HEADER:   \institutionheader\vskip 1.2em
+#+LATEX_HEADER:   \begin{center}
+#+LATEX_HEADER:     {\LARGE \@title \par}\vskip 1em
+#+LATEX_HEADER:     {\large \@author \par}\vskip 0.5em
+#+LATEX_HEADER:     {\large \@date}
+#+LATEX_HEADER:   \end{center}\par\vskip 1.5em}
+#+LATEX_HEADER: \makeatother
+
+#+LATEX_HEADER: % ---- Theme ----
+#+LATEX_HEADER: \usepackage[explicit]{titlesec}
+#+LATEX_HEADER: \usepackage[most]{tcolorbox}
+#+LATEX_HEADER: \usepackage{enumitem}
+#+LATEX_HEADER: % Colors taken from the USTO-MB logo
+#+LATEX_HEADER: \definecolor{ustonavy}{HTML}{323E4B}
+#+LATEX_HEADER: \definecolor{ustosteel}{HTML}{627788}
+#+LATEX_HEADER: \definecolor{ustotaupe}{HTML}{867B7C}
+#+LATEX_HEADER: \setlength{\parindent}{0pt}
+#+LATEX_HEADER: \setlength{\parskip}{5pt}
+#+LATEX_HEADER: \setlist{itemsep=1pt,topsep=2pt}
+#+LATEX_HEADER: \setlist[enumerate,1]{itemsep=6pt,topsep=4pt,label={\sffamily\bfseries\color{ustonavy}\arabic*.}}
+#+LATEX_HEADER: \renewcommand{\arraystretch}{1.4}
+#+LATEX_HEADER: \fancyhead[L]{\sffamily\small\color{ustonavy}Advanced Programming --- TP 2}
+#+LATEX_HEADER: \renewcommand{\headrule}{{\color{ustonavy}\hrule height 0.6pt}}
+#+LATEX_HEADER: % Exercises: full-width bar
+#+LATEX_HEADER: \titleformat{\section}[block]{\Large\sffamily\bfseries}{}{0pt}{%
+#+LATEX_HEADER:   \colorbox{ustonavy}{\parbox{\dimexpr\textwidth-2\fboxsep\relax}{\color{white}\strut #1}}}
+#+LATEX_HEADER: \titlespacing*{\section}{0pt}{14pt}{6pt}
+#+LATEX_HEADER: % Questions
+#+LATEX_HEADER: \titleformat{\subsection}[block]{\large\sffamily\bfseries\color{ustonavy}}{}{0pt}{#1}
+#+LATEX_HEADER: \titlespacing*{\subsection}{0pt}{12pt}{4pt}
+#+LATEX_HEADER: % Information boxes
+#+LATEX_HEADER: \tcbset{labbox/.style={enhanced, arc=2pt, boxrule=0.8pt, left=8pt, right=8pt,
+#+LATEX_HEADER:   fonttitle=\sffamily\bfseries, before skip=10pt, after skip=10pt}}
+#+LATEX_HEADER: \newtcolorbox{objectives}{labbox, colback=ustosteel!6, colframe=ustosteel, title=Objectives}
+#+LATEX_HEADER: \newtcolorbox{nextcourse}{labbox, colback=ustotaupe!7, colframe=ustotaupe, title=Toward the next course}
+
+#+LATEX_HEADER: \lstset{
+#+LATEX_HEADER:   basicstyle=\ttfamily\small,
+#+LATEX_HEADER:   keywordstyle=\color{blue!70!black}\bfseries,
+#+LATEX_HEADER:   commentstyle=\color{green!45!black}\itshape,
+#+LATEX_HEADER:   stringstyle=\color{red!65!black},
+#+LATEX_HEADER:   backgroundcolor=\color{gray!8},
+#+LATEX_HEADER:   frame=single,
+#+LATEX_HEADER:   rulecolor=\color{gray!50},
+#+LATEX_HEADER:   breaklines=true,
+#+LATEX_HEADER:   showstringspaces=false
+#+LATEX_HEADER: }
+
+
+#+BEGIN_objectives
+- Implement a trie and use it to search by prefix.
+- Implement a Bloom filter and count its false positives.
+#+END_objectives
+
+In this TP, a phone number is a string of 10 digits, such as
+="0555123456"=. Use only *randomly generated* numbers, never real ones.
+
+* Exercise 1: A phone book trie
+
+In this exercise, we implement a *trie* (prefix tree) that stores phone
+numbers. The alphabet has only 10 symbols: each node has =children[10]=
+(the child reached by digit =c= is =children[c - '0']=) and a boolean
+=isEnd=, true when a number ends at this node.
+
+1. Implement the trie: the node structure, =insert(number)= and
+   =contains(number)=. Give their complexity as a function of the length
+   $L$ of the number.
+
+2. Write =startsWith(prefix)=, which returns all the numbers that start
+   with =prefix=.
+
+   #+BEGIN_EXAMPLE
+   insert("0555123456"); insert("0555987654"); insert("0661000111")
+   startsWith("0555")  ->  ["0555123456", "0555987654"]
+   startsWith("07")    ->  []
+   #+END_EXAMPLE
+
+3. Write =randomNumber()=, which returns a random 10-digit number starting
+   with =05=, =06= or =07=. Insert $n = 10^5$ random numbers into the
+   trie. Does the complexity of =contains= depend on $n$?
+
+4. Count the nodes of the trie for $n = 10^3$, $10^4$ and $10^5$, and
+   compare with the $10n$ digits stored one after the other.
+
+* Exercise 2: Blocking spam calls
+
+A phone keeps a list of known spam numbers. The list holds millions of
+numbers, too many to store exactly on the phone, so we use a Bloom filter:
+an array of $m$ bits, all 0 at the start. A 10-digit number fits in a
+64-bit integer, so our hash functions are simple operations on the
+number $x$.
+
+1. *One hash function.* Take $h_1(x) = x \bmod m$. Implement =add(x)=
+   (set bit $h_1(x)$ to 1) and =mightContain(x)= (is bit $h_1(x)$ equal to
+   1?). With $m = 10^6$, which digits of the number does $h_1$ use?
+
+2. Insert $n = 10^5$ random spam numbers. Check that =mightContain=
+   answers "maybe" for every one of them. Why can the filter never answer
+   "no" for a spam number? Then test $10^5$ random numbers that are *not*
+   spam (check it with a hash set) and count the false positives.
+
+3. *A second hash function.* Add $h_2(x) = x \bmod 999983$ (a prime
+   number close to $m$). Unlike $h_1$, it depends on *all* the digits of
+   $x$. Now =add= sets *both* bits, and
+   =mightContain= checks both. With the same $m$, count the false
+   positives again. Is it better?
