@@ -31,6 +31,7 @@ complexity analysis.
 | 00 | Introduction to Advanced Programming      | 30/09/2026 | [View](courses/00-Intro.pdf) · [Download](https://github.com/msbelaid/PA_2026/raw/main/courses/00-Intro.pdf)       | [Org](courses/00-Intro.org)                    |
 | 01 | Hash Tables: search in constant time      | 14/10/2026 | [View](courses/01-HashTables.pdf) · [Download](https://github.com/msbelaid/PA_2026/raw/main/courses/01-HashTables.pdf) | [Org](courses/01-HashTables.org)           |
 | 02 | Dynamic Arrays: growing in amortized O(1) | 21/10/2026 | [View](courses/02-DynamicArrays.pdf) · [Download](https://github.com/msbelaid/PA_2026/raw/main/courses/02-DynamicArrays.pdf) | [Org](courses/02-DynamicArrays.org)        |
+| 03 | Tries and Bloom filters: prefixes and probabilistic sets | 28/10/2026 | [View](courses/03-TriesBloomFilters.pdf) · [Download](https://github.com/msbelaid/PA_2026/raw/main/courses/03-TriesBloomFilters.pdf) | [Org](courses/03-TriesBloomFilters.org) |
 
 ## Labs (TP)
 

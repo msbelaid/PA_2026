@@ -1,0 +1,724 @@
+#+TITLE: Tries and Bloom filters
+#+AUTHOR: Mohammed Said BELAID @@latex:\\@@ said.belaid@univ-usto.dz @@latex:\\ \href{https://github.com/msbelaid}{github.com/msbelaid}@@
+#+SUBTITLE: Searching by prefix, and answering "maybe" with very little memory
+#+DATE: 28/10/2026
+#+EMAIL: said.belaid@univ-usto.dz
+#+OPTIONS: H:2
+#+startup: beamer
+#+latex_header: \mode<beamer>{\usetheme{Antibes}}
+#+OPTIONS: listings:t
+#+LaTeX_CLASS: beamer
+#+LATEX_CLASS_OPTIONS: [aspectratio=169]
+#+LATEX_HEADER: \usepackage{listings}
+#+LATEX_HEADER: \usepackage{tikz}
+#+LATEX_HEADER: \usetikzlibrary{positioning}
+#+LATEX_HEADER: \usepackage{pgfplots}
+#+LATEX_HEADER: \pgfplotsset{compat=1.16}
+#+LATEX_HEADER: \tikzset{onslide/.code args={<#1>#2}{\only<#1>{\pgfkeysalso{#2}}}}
+#+LATEX_HEADER: \tikzset{alt/.code args={<#1>#2#3}{\alt<#1>{\pgfkeysalso{#2}}{\pgfkeysalso{#3}}}}
+#+LATEX_HEADER: \tikzset{invisible/.style={opacity=0}, visible on/.style={alt={#1{}{invisible}}}}
+#+LATEX_HEADER: % \cells{cell width}{y}{last index}: empty cells, with their index below
+#+LATEX_HEADER: \newcommand{\cells}[3]{\foreach \i in {0,...,#3} {\draw[fill=gray!8] (\i*#1,#2) rectangle ++(#1,0.6); \node[font=\tiny, gray] at (\i*#1+#1/2,#2-0.15) {\i};}}
+#+LATEX_HEADER: % \vals[fill]{cell width}{y}{index/value list}: filled cells
+#+LATEX_HEADER: \newcommand{\vals}[4][structure!15]{\foreach \i/\v in {#4} {\draw[fill=#1] (\i*#2,#3) rectangle ++(#2,0.6); \node[font=\tiny] at (\i*#2+#2/2,#3+0.3) {\v};}}
+#+LATEX_HEADER: % \bitarray{cell width}{y}: 10 bits set to 0; \ones[fill]{cell width}{y}{indices}: bits set to 1
+#+LATEX_HEADER: \newcommand{\bitarray}[2]{\cells{#1}{#2}{9} \foreach \i in {0,...,9} {\node[font=\scriptsize, gray] at (\i*#1+#1/2,#2+0.3) {0};}}
+#+LATEX_HEADER: \newcommand{\ones}[4][structure!15]{\foreach \i in {#4} {\draw[fill=#1] (\i*#2,#3) rectangle ++(#2,0.6); \node[font=\scriptsize\bfseries] at (\i*#2+#2/2,#3+0.3) {1};}}
+#+LATEX_HEADER: % \hashto{color}{cell width}{x of the word}{word}{indices}: arrows from a word to its bits
+#+LATEX_HEADER: \newcommand{\hashto}[5]{\node[draw, fill=#1, font=\scriptsize, minimum height=0.45cm] (w) at (#3,1.7) {#4}; \foreach \i in {#5} {\draw[->, >=stealth, thick, gray!70!black] (w.south) -- (\i*#2+#2/2,0.65);}}
+#+LATEX_HEADER: % Trie nodes. An end of word is filled in green.
+#+LATEX_HEADER: \tikzset{tnode/.style={circle, draw, fill=gray!8, minimum size=0.55cm, inner sep=0pt, font=\scriptsize}, tend/.style={fill=green!25}}
+#+LATEX_HEADER: % \basetrie: the trie of car, card, care, cat, do, dog. Each node and the edge
+#+LATEX_HEADER: % above it take the optional style t/<node name>, set with \tikzset in a frame.
+#+LATEX_HEADER: \newcommand{\basetrie}{%
+#+LATEX_HEADER:   \node[tnode, t/r/.try] (r) at (3.5,0) {};
+#+LATEX_HEADER:   \node[tnode, t/c/.try] (c) at (2,-0.85) {c};
+#+LATEX_HEADER:   \node[tnode, t/d/.try] (d) at (5,-0.85) {d};
+#+LATEX_HEADER:   \node[tnode, t/ca/.try] (ca) at (2,-1.7) {a};
+#+LATEX_HEADER:   \node[tnode, tend, t/do/.try] (do) at (5,-1.7) {o};
+#+LATEX_HEADER:   \node[tnode, tend, t/car/.try] (car) at (1.2,-2.55) {r};
+#+LATEX_HEADER:   \node[tnode, tend, t/cat/.try] (cat) at (2.8,-2.55) {t};
+#+LATEX_HEADER:   \node[tnode, tend, t/dog/.try] (dog) at (5,-2.55) {g};
+#+LATEX_HEADER:   \node[tnode, tend, t/card/.try] (card) at (0.4,-3.4) {d};
+#+LATEX_HEADER:   \node[tnode, tend, t/care/.try] (care) at (1.2,-3.4) {e};
+#+LATEX_HEADER:   \draw[t/c/.try] (r) -- (c); \draw[t/d/.try] (r) -- (d);
+#+LATEX_HEADER:   \draw[t/ca/.try] (c) -- (ca); \draw[t/do/.try] (d) -- (do);
+#+LATEX_HEADER:   \draw[t/car/.try] (ca) -- (car); \draw[t/cat/.try] (ca) -- (cat); \draw[t/dog/.try] (do) -- (dog);
+#+LATEX_HEADER:   \draw[t/card/.try] (car) -- (card); \draw[t/care/.try] (car) -- (care);}
+#+LATEX_HEADER: % \addcart: adds the word cart to \basetrie
+#+LATEX_HEADER: \newcommand{\addcart}{\node[tnode, tend, t/cart/.try] (cart) at (2.0,-3.4) {t}; \draw[t/cart/.try] (car) -- (cart);}
+
+#+LATEX_HEADER: \lstset{
+#+LATEX_HEADER:   basicstyle=\ttfamily\fontsize{7.5}{9}\selectfont,
+#+LATEX_HEADER:   keywordstyle=\color{blue!70!black}\bfseries,
+#+LATEX_HEADER:   commentstyle=\color{green!45!black}\itshape,
+#+LATEX_HEADER:   stringstyle=\color{red!65!black},
+#+LATEX_HEADER:   backgroundcolor=\color{gray!8},
+#+LATEX_HEADER:   frame=single,
+#+LATEX_HEADER:   rulecolor=\color{gray!50},
+#+LATEX_HEADER:   breaklines=true,
+#+LATEX_HEADER:   showstringspaces=false
+#+LATEX_HEADER: }
+#+LaTeX_HEADER: \logo{\includegraphics[height=1cm]{../images/usto.png}}
+#+LATEX_HEADER: \usepackage{xcolor}
+#+LATEX_HEADER: \AtBeginSection[]{\begin{frame}<beamer>{Outline}\tableofcontents[currentsection]\end{frame}}
+
+
+* The problem: searching by prefix
+
+** Back to the open question
+A hash table holds the words of a dictionary. Find the words starting with ="algo"=.
+
+#+BEGIN_EXPORT latex
+\begin{columns}[c]
+\begin{column}{0.4\textwidth}
+\begin{center}
+\begin{tikzpicture}
+  \foreach \i in {0,...,9} {\draw[fill=gray!8] (0,-\i*0.42) rectangle ++(0.45,0.34); \node[anchor=east, font=\tiny] at (-0.03,-\i*0.42+0.17) {\i};}
+  \foreach \i/\w in {0/hash, 3/table, 6/array, 9/data} {
+    \node[draw, fill=structure!15, font=\tiny, inner sep=1pt, minimum height=0.3cm, anchor=west] at (0.7,-\i*0.42+0.17) {\w};}
+  \foreach \i/\w in {2/algorithm, 5/algorithmic, 8/algorithms} {
+    \node[draw, fill=structure!15, onslide=<2->{fill=orange!45}, font=\tiny, inner sep=1pt, minimum height=0.3cm, anchor=west] at (0.7,-\i*0.42+0.17) {\w};}
+\end{tikzpicture}
+\end{center}
+\end{column}
+\begin{column}{0.58\textwidth}
+\uncover<2->{\alert<2>{The three words are in unrelated buckets.}}
+
+\medskip
+\uncover<3->{\alert<3>{A good hash function scatters similar keys \emph{on purpose}.}}
+
+\medskip
+\uncover<4->{\alert<4>{The only way: scan the whole table, $O(n)$.}}
+\end{column}
+\end{columns}
+\note{Start from the answers students gave at the end of the last course. A hash table is perfect for exact keys and useless for prefixes: the hash of "algorithm" says nothing about the hash of "algorithms". Ask: which structure keeps similar words close to each other?}
+#+END_EXPORT
+
+** First fix: a sorted array
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[>=stealth]
+  \cells{1.6}{0}{6}
+  \vals{1.6}{0}{0/algebra, 4/array, 5/data, 6/hash}
+  \vals[structure!15]{1.6}{0}{1/algorithm, 2/algorithmic, 3/algorithms}
+  \begin{scope}[visible on=<2->]
+    \draw[->, thick, red] (2.4,1.2) node[above, font=\scriptsize] {first word $\geq$ "algo"} -- (2.4,0.65);
+  \end{scope}
+  \begin{scope}[visible on=<3->]
+    \vals[orange!45]{1.6}{0}{1/algorithm, 2/algorithmic, 3/algorithms}
+  \end{scope}
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <+->
+- Words with the same prefix are *neighbours* in sorted order.
+- Binary search for the first word $\geq$ ="algo"=: $O(\log n)$ comparisons.
+- Then read the next words while they start with ="algo"=.
+- But inserting a new word shifts the array: $O(n)$ (see the Dynamic Arrays course).
+
+#+BEGIN_EXPORT latex
+\note{This is a good solution for a fixed dictionary. Each comparison of two words costs up to m character comparisons, so the search is O(m log n). Two weaknesses: insertions are O(n), and each comparison starts again from the first letter, although all the words near the answer share the same beginning.}
+#+END_EXPORT
+
+** The idea: share the prefixes
+#+BEGIN_EXPORT latex
+\begin{center}
+\Large\ttfamily
+\begin{tabular}{l}
+\alert<2->{ca}r \\
+\alert<2->{ca}\textcolor<3->{green!50!black}{rd} \\
+\alert<2->{ca}\textcolor<3->{green!50!black}{re} \\
+\alert<2->{ca}t
+\end{tabular}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <4->
+- Store each common prefix *once*.
+- A word is a *path* of letters, from a root.
+- Words that share a prefix share the beginning of their path.
+
+#+BEGIN_EXPORT latex
+\note{The four words share "ca"; three of them share "car". Instead of storing four strings, we store a tree where each edge is a letter. Finding the words starting with "car" means walking down three edges, then everything below belongs to the answer.}
+#+END_EXPORT
+
+* Tries
+
+** What is a trie?
+#+BEGIN_EXPORT latex
+\begin{columns}[c]
+\begin{column}{0.45\textwidth}
+\begin{center}
+\begin{tikzpicture}
+  \basetrie
+  \node[font=\tiny, gray, anchor=east] at (3.2,0) {root};
+\end{tikzpicture}
+\end{center}
+\end{column}
+\begin{column}{0.53\textwidth}
+\begin{block}{Trie (prefix tree)}
+A tree where each node is reached by one letter, and each path from the root spells a prefix.
+A node is \emph{marked} when its path is a whole word.
+\end{block}
+
+\pause
+Words: car, card, care, cat, do, dog.
+
+\medskip
+\begin{tikzpicture}\node[tnode, tend] {};\end{tikzpicture} marks the end of a word.
+\end{column}
+\end{columns}
+\note{The name comes from reTRIEval (Fredkin, 1960); it is usually pronounced "try", to distinguish it from "tree". The letter really belongs to the edge; we write it in the child node to keep the drawing simple. Ask: why must "do" be marked? Because its node has a child: without the mark, we could not tell that "do" is a word, and not only a prefix of "dog".}
+#+END_EXPORT
+
+** Inside a node
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[>=stealth]
+  \foreach \l [count=\i from 0] in {a,...,z} {
+    \draw[fill=gray!8] (\i*0.42,0) rectangle ++(0.42,0.42);
+    \node[font=\tiny] at (\i*0.42+0.21,-0.15) {\l};}
+  \draw[fill=green!25] (26*0.42+0.3,0) rectangle ++(1.4,0.42);
+  \node[font=\tiny] at (26*0.42+1.0,0.21) {isEnd = false};
+  \node[font=\scriptsize, anchor=east] at (-0.1,0.21) {node "ca"};
+  \foreach \l/\i in {r/17, t/19} {
+    \fill (\i*0.42+0.21,0.21) circle (1.5pt);
+    \draw[->, thick, visible on=<2->] (\i*0.42+0.21,0.21) -- (\i*0.42+0.21,-0.9) node[below, tnode] {\l};}
+  \node[font=\scriptsize, gray, visible on=<2->] at (4,-1.1) {24 other cells: \texttt{null}};
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <3->
+- =children[26]=: the child reached by each letter (=children[c - 'a']=).
+- =isEnd=: does a word end here?
+- Following a letter is a direct array access: $O(1)$.
+
+#+BEGIN_EXPORT latex
+\note{The letters are not stored anywhere: the position of the child in the array is the letter, exactly like the key used as an index in direct access (Hash Tables course). Here the alphabet has 26 letters; a trie over bytes would need 256 cells per node.}
+#+END_EXPORT
+
+* Operations on a trie
+
+** Inserting a word
+#+BEGIN_EXPORT latex
+\tikzset{t/c/.style={onslide=<2-5>{fill=orange!45}}, t/ca/.style={onslide=<3-5>{fill=orange!45}},
+  t/car/.style={onslide=<4-5>{fill=orange!45}},
+  t/cart/.style={visible on=<5->, onslide=<5>{fill=orange!45}}}
+\begin{columns}[c]
+\begin{column}{0.45\textwidth}
+\begin{center}
+\begin{tikzpicture}
+  \basetrie \addcart
+\end{tikzpicture}
+\end{center}
+\end{column}
+\begin{column}{0.53\textwidth}
+\texttt{insert("cart")}:
+
+\medskip
+\uncover<2->{\alert<2-4>{Follow c, a, r: these nodes already exist.}}
+
+\medskip
+\uncover<5->{\alert<5>{No child for t: create a new node.}}
+
+\medskip
+\uncover<6->{\alert<6>{End of the word: mark the last node.}}
+
+\medskip
+\uncover<7->{\alert<7>{Cost: $O(m)$, with $m$ the length of the word.}}
+\end{column}
+\end{columns}
+\note{Insertion walks down as long as the path exists, then creates the missing nodes, one per remaining letter. Ask: what happens if we insert "ca"? No new node at all: we only mark the node "ca". And inserting "car" a second time changes nothing. The cost depends on the length of the word, not on the number of words in the trie.}
+#+END_EXPORT
+
+** Searching a word
+#+BEGIN_EXPORT latex
+\tikzset{t/c/.style={onslide=<2-4>{fill=orange!45}}, t/ca/.style={onslide=<2-3>{fill=orange!45}},
+  t/car/.style={onslide=<2>{fill=orange!45}}}
+\begin{columns}[c]
+\begin{column}{0.45\textwidth}
+\begin{center}
+\begin{tikzpicture}
+  \basetrie \addcart
+  \node[tnode, draw=red, dashed, fill=red!10, visible on=<4>] (co) at (3.2,-1.7) {o};
+  \draw[red, dashed, visible on=<4>] (c) -- (co);
+\end{tikzpicture}
+\end{center}
+\end{column}
+\begin{column}{0.53\textwidth}
+\uncover<2->{\alert<2>{\texttt{contains("car")}: path c, a, r; the node is marked: \textbf{true}.}}
+
+\medskip
+\uncover<3->{\alert<3>{\texttt{contains("ca")}: path c, a; not marked: \textbf{false}.}}
+
+\medskip
+\uncover<4->{\alert<4>{\texttt{contains("cow")}: no child o under c: \textbf{false}.}}
+
+\medskip
+\uncover<5->{\alert<5>{\texttt{startsWith("ca")}: the path exists: \textbf{true}. The mark does not matter.}}
+\end{column}
+\end{columns}
+\note{Two different questions use the same walk. contains checks the mark at the end; startsWith only checks that the path exists. Both cost O(m) in the worst case, and a search for a missing word often stops early, at the first missing letter.}
+#+END_EXPORT
+
+** Autocomplete: all the words with a prefix
+#+BEGIN_EXPORT latex
+\tikzset{t/c/.style={onslide=<2>{fill=orange!45}}, t/ca/.style={onslide=<2>{fill=orange!45}},
+  t/car/.style={onslide=<2>{fill=orange!45}, onslide=<3->{draw=blue, very thick}},
+  t/card/.style={onslide=<3->{draw=blue, very thick}}, t/care/.style={onslide=<3->{draw=blue, very thick}},
+  t/cart/.style={onslide=<3->{draw=blue, very thick}}}
+\begin{columns}[c]
+\begin{column}{0.45\textwidth}
+\begin{center}
+\begin{tikzpicture}
+  \basetrie \addcart
+\end{tikzpicture}
+\end{center}
+\end{column}
+\begin{column}{0.53\textwidth}
+\texttt{wordsWithPrefix("car")}:
+
+\medskip
+\uncover<2->{\alert<2>{\textbf{1.} Walk down to the node of the prefix: $O(m)$.}}
+
+\medskip
+\uncover<3->{\alert<3>{\textbf{2.} Visit its whole subtree (depth-first), and collect every marked node:}}
+
+\smallskip
+\uncover<3->{\quad car, card, care, cart}
+
+\medskip
+\uncover<4->{\alert<4>{Visiting the children from a to z gives the words in \emph{alphabetical order}.}}
+\end{column}
+\end{columns}
+\note{The depth-first traversal keeps the current path as a string: add a letter when going down, remove it when coming back. The cost is proportional to the size of the subtree, that is, to the size of the answer, and not to n. This is the open question solved: no scan of the whole dictionary. The sorted order comes for free, as in an in-order traversal of a binary search tree.}
+#+END_EXPORT
+
+** Deleting a word
+#+BEGIN_EXPORT latex
+\tikzset{t/c/.style={onslide=<2>{fill=orange!45}}, t/ca/.style={onslide=<2>{fill=orange!45}},
+  t/car/.style={onslide=<2>{fill=orange!45}},
+  t/card/.style={visible on=<-3>, onslide=<2>{fill=orange!45}, onslide=<3>{fill=gray!8}},
+  t/do/.style={onslide=<5->{fill=gray!8}}}
+\begin{columns}[c]
+\begin{column}{0.45\textwidth}
+\begin{center}
+\begin{tikzpicture}
+  \basetrie \addcart
+\end{tikzpicture}
+\end{center}
+\end{column}
+\begin{column}{0.53\textwidth}
+\uncover<2->{\alert<2>{\texttt{remove("card")}: find the node of the word.}}
+
+\medskip
+\uncover<3->{\alert<3>{Unmark it.}}
+
+\medskip
+\uncover<4->{\alert<4>{It has no child and is not marked: remove it. Its parent "car" is marked: stop.}}
+
+\medskip
+\uncover<5->{\alert<5>{\texttt{remove("do")}: unmark it, but keep the node: "dog" goes through it.}}
+\end{column}
+\end{columns}
+\note{Deletion has two steps: unmark, then clean up the nodes that no longer lead to any word, going back up towards the root. Unmarking alone is already correct (contains returns false), but it leaves useless nodes in memory. The cleanup stops at the first node that is marked or that still has another child. Cost: O(m).}
+#+END_EXPORT
+
+** Exercise: build a trie
+Insert the words: =to=, =tea=, =ted=, =ten=, =i=, =in=, =inn=.
+
+1. Draw the trie. How many nodes does it have, root included?
+2. Which nodes are marked?
+3. List the words returned by =wordsWithPrefix("te")=, in order.
+4. Remove =in=, then =inn=: draw the trie after each removal.
+
+#+BEGIN_EXPORT latex
+\note{Answers. 1. 10 nodes: the root; t, to, te, tea, ted, ten; i, in, inn. 2. Seven marked nodes, one per word: to, tea, ted, ten, i, in, inn. 3. tea, ted, ten. 4. Removing "in" only unmarks its node (inn goes through it). Removing "inn" then deletes the node inn, then the node in (no child, not marked), and stops at i, which is marked.}
+#+END_EXPORT
+
+* Cost of a trie
+
+** Time
+$n$ words, $m$ = length of the searched word, $r$ = number of answers.
+
+| Operation             | Hash table           | Sorted array          | Trie                        |
+|-----------------------+----------------------+-----------------------+-----------------------------|
+| Search a word         | $O(m)$ on average    | $O(m \log n)$         | $O(m)$                      |
+| Insert a word         | $O(m)$ on average    | $O(n)$: shifting      | $O(m)$                      |
+| Words with a prefix   | $O(n)$: scan all     | $O(m \log n + r)$     | $O(m + \text{subtree})$     |
+| Words in sorted order | sort: $O(n \log n)$  | already sorted        | depth-first traversal       |
+
+\pause
+- A trie *never depends on $n$* for one word: only on its length.
+- Hashing a string is $O(m)$ too: the hash table is not "free".
+
+#+BEGIN_EXPORT latex
+\note{Recall String.hashCode() from the Hash Tables course: it reads every character, so a hash table lookup also costs O(m), plus the final comparison with equals. Asymptotically, a trie and a hash table are equal for exact search; the trie wins as soon as prefixes or order matter. The subtree size is the number of nodes below the prefix, proportional to the total length of the answers.}
+#+END_EXPORT
+
+* Tries in practice
+
+** Where are tries used?
+- *Autocomplete*: search bars, code editors, phone keyboards.
+- *Spell checking*: is this word in the dictionary? Which words are close to it?
+- *IP routing*: a router finds the *longest prefix* of the address in its table (a binary trie of bits).
+- *Word games*: stop exploring as soon as the letters are not a prefix of any word (Boggle, crosswords).
+
+#+BEGIN_EXPORT latex
+\note{In IP routing, the keys are the bits of the address: each node has two children, 0 and 1, and the router keeps the last marked node met on the way down. In word games, startsWith prunes the search: if no word starts with the letters chosen so far, the whole branch is skipped. We will meet this idea again in the course on backtracking.}
+#+END_EXPORT
+
+* Probabilistic data structures
+
+** A very large set
+A browser checks every visited URL against a list of *1 million* malicious URLs.
+
+#+ATTR_BEAMER: :overlay <+->
+- Hash set: $O(1)$ per check, but it stores every URL. $\approx 100$ MB of memory.
+- Trie: shares prefixes, but one node per character: not better.
+- Almost every URL is safe: the answer is "no" 99.9% of the time.
+
+\pause
+Does the answer have to be *exact*?
+
+#+BEGIN_EXPORT latex
+\note{Order of magnitude for Java: a URL of about 60 characters is a String of about 100 bytes, plus a HashMap node and a table cell, so about 130 bytes per URL. The list must fit on every phone and be checked at each click. Let students propose ideas before the next slide: most will want to compress the URLs; the idea here is more radical: do not store them at all.}
+#+END_EXPORT
+
+** Trading exactness for memory
+#+BEGIN_EXPORT latex
+\begin{block}{Probabilistic data structure}
+A structure that answers with a small, \emph{controlled} probability of error,
+in exchange for much less memory or time than an exact structure.
+\end{block}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <+->
+- We choose the error rate: 1%, 0.1%, ...
+- The error is *one-sided*: we know which answers can be wrong.
+- A "maybe" can be checked afterwards by a slow, exact method.
+
+#+BEGIN_EXPORT latex
+\note{The key word is controlled: we can compute the probability of error, and choose the memory to reach the rate we want. One-sided: for the browser, a "no" must be certain (otherwise we would let a malicious site through), but a rare "maybe" only costs a check on the server.}
+#+END_EXPORT
+
+** Randomized or approximate?
+Two different uses of randomness:
+
+|                    | Randomized, exact                     | Approximate                         |
+|--------------------+---------------------------------------+-------------------------------------|
+| The answer         | always correct                        | rarely wrong                        |
+| Randomness affects | the running time                      | the answer                          |
+| Examples           | randomized quicksort, skip list       | Bloom filter, HyperLogLog           |
+
+\pause
+Hash tables already rely on "random-looking" hash values: $O(1)$ *on average*, but always the right answer.
+
+#+BEGIN_EXPORT latex
+\note{Do not confuse the two. Randomized quicksort is always correct, only its running time is random. A Bloom filter is always fast, but its answer can be wrong. We come back to randomized algorithms in the part on algorithmic paradigms.}
+#+END_EXPORT
+
+** A family of probabilistic structures
+| Structure        | Question answered                 | Error                     |
+|------------------+-----------------------------------+---------------------------|
+| Bloom filter     | Is $x$ in the set?                | false "yes"               |
+| Count-Min Sketch | How many times did $x$ appear?    | overestimates the count   |
+| HyperLogLog      | How many distinct elements?       | $\approx 1\%$ with 12 KB  |
+| MinHash          | How similar are two sets?         | approximate similarity    |
+
+\pause
+Today: the *Bloom filter*, the simplest and the most used.
+
+#+BEGIN_EXPORT latex
+\note{Only mention the others. HyperLogLog counts the distinct visitors of a website, even billions of them, with about 12 KB of memory (this is the setting used by Redis). Count-Min Sketch finds the most frequent search queries in a stream. MinHash detects near-duplicate web pages. All of them use hash functions, like the Bloom filter.}
+#+END_EXPORT
+
+* Bloom filters
+
+** First idea: a hash set of bits
+Keep only *one bit* per bucket: the bucket is used or not. $m = 10$ bits, one hash function $h$.
+
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}
+  \bitarray{1.0}{0}
+  \begin{scope}[visible on=<2->] \ones{1.0}{0}{4} \end{scope}
+  \begin{scope}[visible on=<3->] \ones{1.0}{0}{7} \end{scope}
+  \begin{scope}[visible on=<2>] \hashto{green!25}{1.0}{2.5}{add("Sara"): h = 4}{4} \end{scope}
+  \begin{scope}[visible on=<3>] \hashto{green!25}{1.0}{6.0}{add("Ahmed"): h = 7}{7} \end{scope}
+  \begin{scope}[visible on=<4->] \hashto{orange!45}{1.0}{6.0}{contains("Lina"): h = 7}{7} \end{scope}
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+\vspace{-2mm}
+#+ATTR_BEAMER: :overlay <5->
+- Bit 7 is 1, but Lina was never added: a *false positive*, caused by a collision.
+- A bit set to 0 is certain: nothing was ever added there.
+- 10 bits for any number of names, but many collisions.
+
+#+BEGIN_EXPORT latex
+\note{This is a hash table that forgot its keys: we cannot check which name set the bit. With one hash function, the false positive rate is the fraction of bits set to 1, which grows quickly. Idea of Burton Bloom (1970): check several bits per element instead of one.}
+#+END_EXPORT
+
+** Bloom filter: $k$ hash functions
+#+BEGIN_EXPORT latex
+\begin{block}{Bloom filter}
+An array of $m$ bits, all 0 at the start, and $k$ hash functions $h_1, \dots, h_k$ with values in $[0, m)$.
+\begin{itemize}
+\item \texttt{add(x)}: set the $k$ bits $h_1(x), \dots, h_k(x)$ to 1.
+\item \texttt{mightContain(x)}: are the $k$ bits $h_1(x), \dots, h_k(x)$ all 1?
+\end{itemize}
+\end{block}
+#+END_EXPORT
+
+\pause
+- A false positive needs a collision on *all* $k$ bits: much rarer.
+- Both operations cost $O(k)$, whatever the number of elements.
+- The elements themselves are *never stored*.
+
+#+BEGIN_EXPORT latex
+\note{The name mightContain (from Guava) is honest: the answer is "no" or "maybe". The cost is k hash computations and k bit accesses; k is a small constant, typically between 3 and 10. The memory is m bits, whatever the length of the elements: a 2 KB URL costs the same as a 10-character name.}
+#+END_EXPORT
+
+** Inserting: an example
+$m = 10$ bits, $k = 3$ hash functions.
+
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}
+  \bitarray{1.0}{0}
+  \begin{scope}[visible on=<2->] \ones{1.0}{0}{1, 4, 7} \end{scope}
+  \begin{scope}[visible on=<3->] \ones{1.0}{0}{3, 8} \end{scope}
+  \begin{scope}[visible on=<3>] \ones[orange!45]{1.0}{0}{4} \end{scope}
+  \begin{scope}[visible on=<2>] \hashto{green!25}{1.0}{4.5}{add("Sara"): 1, 4, 7}{1, 4, 7} \end{scope}
+  \begin{scope}[visible on=<3>] \hashto{green!25}{1.0}{5.5}{add("Ahmed"): 3, 4, 8}{3, 4, 8} \end{scope}
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- Sara sets bits 1, 4 and 7.
+- Ahmed sets bits 3, 4 and 8. Bit 4 is already 1: elements *share* bits.
+
+#+BEGIN_EXPORT latex
+\note{The hash values are chosen for the example. Setting a bit that is already 1 changes nothing. After these two insertions, 5 bits out of 10 are set. Ask: which other names would be reported as present? Any name whose three bits fall among 1, 3, 4, 7 and 8.}
+#+END_EXPORT
+
+** Looking up: "no" or "maybe"
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}
+  \bitarray{1.0}{0}
+  \ones{1.0}{0}{1, 3, 4, 7, 8}
+  \begin{scope}[visible on=<2>] \hashto{orange!45}{1.0}{4.5}{Lina: 2, 4, 7}{2, 4, 7}
+    \draw[red, very thick] (2,0) rectangle ++(1,0.6); \end{scope}
+  \begin{scope}[visible on=<3>] \hashto{green!25}{1.0}{4.5}{Sara: 1, 4, 7}{1, 4, 7} \end{scope}
+  \begin{scope}[visible on=<4>] \hashto{orange!45}{1.0}{4.5}{Yacine: 1, 3, 8}{1, 3, 8} \end{scope}
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- Lina: bit 2 is 0. *Definitely not* in the set.
+- Sara: all three bits are 1. *Maybe* in the set (and she is).
+- Yacine: all three bits are 1, set by Sara and Ahmed. *Maybe*, but he is not: a false positive.
+
+#+BEGIN_EXPORT latex
+\begin{alertblock}<5->{One-sided error}
+\textbf{No} is always right: no false negatives. \textbf{Yes} means \emph{maybe}: false positives are possible.
+\end{alertblock}
+\note{Ask students why a false negative is impossible: an added element set its k bits to 1, and bits are never reset to 0. So its k bits are still 1 at lookup time. A lookup can stop at the first 0 bit, which makes "no" answers even faster.}
+#+END_EXPORT
+
+** Why we cannot delete
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}
+  \bitarray{1.0}{0}
+  \ones{1.0}{0}{1, 7}
+  \begin{scope}[visible on=<1>] \ones{1.0}{0}{3, 4, 8} \end{scope}
+  \begin{scope}[visible on=<1>] \hashto{red!25}{1.0}{5.5}{remove("Ahmed"): 3, 4, 8}{3, 4, 8} \end{scope}
+  \begin{scope}[visible on=<2->] \hashto{orange!45}{1.0}{4.5}{Sara: 1, 4, 7}{1, 4, 7}
+    \draw[red, very thick] (4,0) rectangle ++(1,0.6); \end{scope}
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <2->
+- Clearing Ahmed's bits also clears bit 4, which Sara needs.
+- Sara is now reported "definitely not": a *false negative*!
+- The fix, a *counting* Bloom filter: a small counter per cell instead of a bit, incremented by =add= and decremented by =remove=.
+
+#+BEGIN_EXPORT latex
+\note{A bit does not know how many elements set it. A counting Bloom filter stores, for example, 4 bits per cell: memory is multiplied by 4. Removing an element that was never added would still break the filter, so we must be sure the element is present.}
+#+END_EXPORT
+
+* How wrong can a Bloom filter be?
+
+** The false positive rate
+$n$ elements added, $m$ bits, $k$ hash functions (assumed uniform and independent).
+
+#+ATTR_BEAMER: :overlay <+->
+- One hash sets a given bit with probability $1/m$.
+- After $n$ insertions ($kn$ hashes), a bit is still 0 with probability
+  $\left(1 - \frac{1}{m}\right)^{kn} \approx e^{-kn/m}$.
+- A false positive: the $k$ bits of an absent element are all 1:
+
+#+BEGIN_EXPORT latex
+\uncover<4->{
+\[
+p \approx \left(1 - e^{-kn/m}\right)^{k}
+\]}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <5->
+- $p$ depends only on $m/n$ (bits per element) and $k$.
+
+#+BEGIN_EXPORT latex
+\note{The approximation uses (1 - 1/m)^m close to 1/e for large m. Do not insist on the derivation: the point is that the error rate is predictable. It increases with n: a filter that receives more elements than planned becomes useless (all bits 1, everything is "maybe"). The formula ignores that the k bits are not quite independent; it is accurate enough in practice.}
+#+END_EXPORT
+
+** Choosing $k$
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}
+\begin{axis}[
+    width=10cm, height=4.6cm,
+    ymode=log, xmin=0.5, xmax=15.5,
+    xlabel={number of hash functions $k$}, ylabel={false positive rate $p$},
+    xtick={1,3,5,7,9,11,13,15},
+    tick label style={font=\tiny}, label style={font=\scriptsize},
+    legend style={font=\tiny, at={(0.98,0.97)}, anchor=north east},
+    legend cell align=left]
+  \addplot[mark=*, mark size=1.2pt, thick, structure, domain=1:15, samples=15] {(1-exp(-x/5))^x};
+  \addlegendentry{$m/n = 5$ bits per element}
+  \addplot[mark=*, mark size=1.2pt, thick, orange!80!black, domain=1:15, samples=15] {(1-exp(-x/10))^x};
+  \addlegendentry{$m/n = 10$ bits per element}
+\end{axis}
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+- Too few hashes: each check is weak. Too many: the array fills with 1s.
+- Best choice: $k = \frac{m}{n} \ln 2 \approx 0.7 \, \frac{m}{n}$. Then half of the bits are 1.
+
+#+BEGIN_EXPORT latex
+\note{The y axis is logarithmic. For 10 bits per element, the minimum is at k = 7, with p of about 0.8\%. Each extra hash function makes a false positive harder, but also sets more bits to 1. At the optimum, a bit is 1 with probability 1/2: the filter carries as much information as possible.}
+#+END_EXPORT
+
+** Sizing a filter
+With the best $k$:
+
+| Bits per element $m/n$ | Best $k$ | False positive rate $p$ |
+|------------------------+----------+-------------------------|
+|                      5 |        3 | 9.2%                    |
+|                      8 |        6 | 2.2%                    |
+|                     10 |        7 | 0.82%                   |
+|                     15 |       10 | 0.074%                  |
+|                     20 |       14 | 0.0067%                 |
+
+\pause
+- About 10 bits per element for 1%; 5 more bits divide $p$ by 10.
+- The memory does *not* depend on the size of the elements.
+
+#+BEGIN_EXPORT latex
+\note{The general formula for a target rate p is m = -n ln(p) / (ln 2)^2, about 9.6 n bits for p = 1\%. Insist on the last point: storing a URL or a whole document costs the same 10 bits.}
+#+END_EXPORT
+
+** Back to the malicious URLs
+1 million URLs, false positive rate 1%:
+
+| Structure     | Memory            | Answers                     |
+|---------------+-------------------+-----------------------------|
+| =HashSet=     | $\approx 100$ MB  | exact                       |
+| Bloom filter  | $\approx 1.2$ MB  | "no" exact, "maybe" at 1%   |
+
+\pause
+- 80 times less memory: the filter fits in any browser.
+- 1 visit in 100 to a safe site needs an extra check with the server.
+
+#+BEGIN_EXPORT latex
+\note{1.2 MB = 9.6 million bits / 8. The safe visits that get a "maybe" are checked with the server, which holds the exact list; the 99\% of other safe visits are answered locally, at no cost. Early versions of Google Chrome used a Bloom filter for exactly this purpose (Safe Browsing).}
+#+END_EXPORT
+
+* Bloom filters in practice
+
+** A cheap filter in front of an expensive check
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[>=stealth, box/.style={draw, rounded corners, align=center, font=\scriptsize, minimum height=0.9cm, inner sep=4pt}]
+  \node[box, fill=gray!8] (q) at (0,0) {query $x$};
+  \node[box, fill=structure!15] (b) at (3.5,0) {Bloom filter\\in memory, fast};
+  \node[box, fill=green!25, visible on=<2->] (no) at (7.5,1.1) {"no": answer at once};
+  \node[box, fill=orange!45, visible on=<3->] (db) at (7.5,-1.1) {disk, database, server\\slow, exact};
+  \draw[->, thick] (q) -- (b);
+  \draw[->, thick, visible on=<2->] (b) -- node[above, sloped, font=\tiny] {most queries} (no);
+  \draw[->, thick, visible on=<3->] (b) -- node[below, sloped, font=\tiny] {"maybe"} (db);
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <4->
+- The filter never changes the final answer: it only avoids useless slow checks.
+- A false positive costs one extra check, never a wrong result.
+
+#+BEGIN_EXPORT latex
+\note{This is the typical design: the Bloom filter is not used alone, it protects an expensive resource. It pays off when most queries are negative, and when a slow check costs much more than k hash computations: a disk read, a network request.}
+#+END_EXPORT
+
+** Where are Bloom filters used?
+- *Databases* (Cassandra, HBase, RocksDB): one filter per file on disk, to skip the files that cannot contain a key.
+- *Browsers*: checking URLs against a list of malicious sites.
+- *Web caches*: cache a page only at its second request; most pages are requested once.
+- *Spell checkers* and *password checkers*: is this word in a huge list?
+
+#+BEGIN_EXPORT latex
+\note{Databases: a key lookup may otherwise read many files on disk; the filter of each file says "not here" in memory. Web caches: Akamai found that most of the URLs requested are requested only once; a Bloom filter remembers which URLs were already seen, without storing them. Password checkers: reject passwords that appear in a list of leaked passwords.}
+#+END_EXPORT
+
+** In the libraries
+No Bloom filter in the Java, Python or C++ standard libraries.
+
+#+begin_src java
+// Google Guava
+BloomFilter<String> urls = BloomFilter.create(
+    Funnels.stringFunnel(StandardCharsets.UTF_8),
+    1_000_000,  // expected number of elements
+    0.01);      // false positive rate
+
+urls.put("http://malicious.example");
+urls.mightContain("http://usto.dz"); // false (or, rarely, true)
+#+end_src
+
+- Python: packages on PyPI, such as =pybloom-live=.
+- Redis: =BF.ADD= and =BF.EXISTS= commands.
+
+#+BEGIN_EXPORT latex
+\note{Guava asks for n and p, and computes m and k itself. A Funnel tells Guava how to turn an object into bytes before hashing. Redis offers the structure on a server, shared by several programs.}
+#+END_EXPORT
+
+* Summary
+
+** Key takeaways
+- A *trie* stores words as paths of letters: search, insert and prefix queries in $O(m)$, independent of $n$.
+- *Probabilistic* structures trade a small, controlled error for much less memory.
+- A *Bloom filter*: $k$ hash functions, $m$ bits. "No" is certain, "yes" means "maybe".
+- About 10 bits per element give 1% of false positives, whatever the size of the elements.
+
+#+BEGIN_EXPORT latex
+\note{Ask students to give, for each structure seen so far (hash table, dynamic array, trie, Bloom filter), one problem where it is the right choice. This closes the part on data structures: from now on, the question is no longer how to store the data, but how to design the algorithm.}
+#+END_EXPORT
+
+** From data structures to algorithms
+#+ATTR_BEAMER: :overlay <+->
+- Hash tables, dynamic arrays, tries, Bloom filters: the *choice of the data structure* decides the efficiency of a program, in *time* and in *memory*.
+- But a good structure is not enough: the *algorithm* that uses it matters just as much.
+- Next part, *algorithmic paradigms*: general methods to design efficient algorithms (brute force, divide and conquer, greedy algorithms, dynamic programming, ...).
+
+#+BEGIN_EXPORT latex
+\note{Close the part on data structures. The same problem can be solved in O(n) or in O(1) per operation depending on the structure, and with 100 MB or 1 MB of memory. From the next course on, the question is no longer how to store the data, but how to design the algorithm itself.}
+#+END_EXPORT
