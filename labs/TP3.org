@@ -1,0 +1,197 @@
+#+TITLE: TP 3 : Algorithmic Paradigms
+#+SUBTITLE: Greedy, dynamic programming and backtracking
+#+AUTHOR: Mohammed Said BELAID @@latex:\\@@ said.belaid@univ-usto.dz
+#+DATE: 24/11/2026
+#+EMAIL: said.belaid@univ-usto.dz
+#+OPTIONS: toc:nil num:nil
+#+LaTeX_CLASS: article
+#+LATEX_CLASS_OPTIONS: [11pt,a4paper]
+#+LATEX_HEADER: \usepackage[margin=2cm]{geometry}
+#+LATEX_HEADER: \usepackage{lmodern}
+#+LATEX_HEADER: \usepackage{listings}
+#+LATEX_HEADER: \usepackage{xcolor}
+#+LATEX_HEADER: \usepackage{graphicx}
+#+LATEX_HEADER: \usepackage{fancyhdr}
+#+LATEX_HEADER: \pagestyle{fancy}
+#+LATEX_HEADER: \fancyhead[R]{\includegraphics[height=0.8cm]{../images/usto.png}}
+#+LATEX_HEADER: \setlength{\headheight}{24pt}
+#+LATEX_HEADER: \newcommand{\institutionheader}{%
+#+LATEX_HEADER:   \noindent
+#+LATEX_HEADER:   \begin{minipage}[c]{0.14\textwidth}\includegraphics[height=1.6cm]{../images/usto.png}\end{minipage}%
+#+LATEX_HEADER:   \begin{minipage}[c]{0.86\textwidth}\centering
+#+LATEX_HEADER:     {\bfseries University of Science and Technology of Oran, Mohamed Boudiaf}\\[3pt]
+#+LATEX_HEADER:     Faculty of Mathematics and Informatics\\[1pt]
+#+LATEX_HEADER:     Department of Computer Science
+#+LATEX_HEADER:   \end{minipage}\par\vspace{6pt}\hrule}
+#+LATEX_HEADER: \makeatletter
+#+LATEX_HEADER: \renewcommand{\@maketitle}{%
+#+LATEX_HEADER:   \institutionheader\vskip 1.2em
+#+LATEX_HEADER:   \begin{center}
+#+LATEX_HEADER:     {\LARGE \@title \par}\vskip 1em
+#+LATEX_HEADER:     {\large \@author \par}\vskip 0.5em
+#+LATEX_HEADER:     {\large \@date}
+#+LATEX_HEADER:   \end{center}\par\vskip 1.5em}
+#+LATEX_HEADER: \makeatother
+
+#+LATEX_HEADER: % ---- Theme ----
+#+LATEX_HEADER: \usepackage[explicit]{titlesec}
+#+LATEX_HEADER: \usepackage[most]{tcolorbox}
+#+LATEX_HEADER: \usepackage{enumitem}
+#+LATEX_HEADER: % Colors taken from the USTO-MB logo
+#+LATEX_HEADER: \definecolor{ustonavy}{HTML}{323E4B}
+#+LATEX_HEADER: \definecolor{ustosteel}{HTML}{627788}
+#+LATEX_HEADER: \definecolor{ustotaupe}{HTML}{867B7C}
+#+LATEX_HEADER: \setlength{\parindent}{0pt}
+#+LATEX_HEADER: \setlength{\parskip}{5pt}
+#+LATEX_HEADER: \setlist{itemsep=1pt,topsep=2pt}
+#+LATEX_HEADER: \setlist[enumerate,1]{itemsep=6pt,topsep=4pt,label={\sffamily\bfseries\color{ustonavy}\arabic*.}}
+#+LATEX_HEADER: \renewcommand{\arraystretch}{1.4}
+#+LATEX_HEADER: \fancyhead[L]{\sffamily\small\color{ustonavy}Advanced Programming: TP 3}
+#+LATEX_HEADER: \renewcommand{\headrule}{{\color{ustonavy}\hrule height 0.6pt}}
+#+LATEX_HEADER: % Exercises: full-width bar
+#+LATEX_HEADER: \titleformat{\section}[block]{\Large\sffamily\bfseries}{}{0pt}{%
+#+LATEX_HEADER:   \colorbox{ustonavy}{\parbox{\dimexpr\textwidth-2\fboxsep\relax}{\color{white}\strut #1}}}
+#+LATEX_HEADER: \titlespacing*{\section}{0pt}{14pt}{6pt}
+#+LATEX_HEADER: % Questions
+#+LATEX_HEADER: \titleformat{\subsection}[block]{\large\sffamily\bfseries\color{ustonavy}}{}{0pt}{#1}
+#+LATEX_HEADER: \titlespacing*{\subsection}{0pt}{12pt}{4pt}
+#+LATEX_HEADER: % Information boxes
+#+LATEX_HEADER: \tcbset{labbox/.style={enhanced, arc=2pt, boxrule=0.8pt, left=8pt, right=8pt,
+#+LATEX_HEADER:   fonttitle=\sffamily\bfseries, before skip=10pt, after skip=10pt}}
+#+LATEX_HEADER: \newtcolorbox{objectives}{labbox, colback=ustosteel!6, colframe=ustosteel, title=Objectives}
+#+LATEX_HEADER: \newtcolorbox{nextcourse}{labbox, colback=ustotaupe!7, colframe=ustotaupe, title=Toward the next course}
+
+#+LATEX_HEADER: \usepackage{tikz}
+#+LATEX_HEADER: % \costgrid{n}{row-major values}{cells to color, as r/c}{color}
+#+LATEX_HEADER: \newcommand{\costgrid}[4]{\begin{tikzpicture}[x=0.65cm,y=0.65cm]
+#+LATEX_HEADER:   \foreach \r/\c in {#3} {\fill[#4] (\c,#1-\r-1) rectangle ++(1,1);}
+#+LATEX_HEADER:   \draw[gray!70] (0,0) grid[step=1] (#1,#1); \draw[thick] (0,0) rectangle (#1,#1);
+#+LATEX_HEADER:   \foreach \v [count=\k from 0] in {#2} {\pgfmathtruncatemacro{\r}{floor(\k/#1)}\pgfmathtruncatemacro{\c}{mod(\k,#1)}
+#+LATEX_HEADER:     \node at (\c+0.5,#1-\r-0.5) {\v};}\end{tikzpicture}}
+#+LATEX_HEADER: % \sudoku{n}{box size}{row-major list of digit/kind}: kind 1 = given, 2 = found, 0 = empty
+#+LATEX_HEADER: \newcommand{\sudoku}[3]{\begin{tikzpicture}[x=0.55cm,y=0.55cm]
+#+LATEX_HEADER:   \draw[gray!60] (0,0) grid[step=1] (#1,#1);
+#+LATEX_HEADER:   \foreach \i in {0,#2,...,#1} {\draw[very thick] (\i,0) -- (\i,#1); \draw[very thick] (0,\i) -- (#1,\i);}
+#+LATEX_HEADER:   \foreach \v/\t [count=\k from 0] in {#3} {\pgfmathtruncatemacro{\r}{floor(\k/#1)}\pgfmathtruncatemacro{\c}{mod(\k,#1)}
+#+LATEX_HEADER:     \ifnum\t=1 \node[font=\bfseries] at (\c+0.5,#1-\r-0.5) {\v};\fi
+#+LATEX_HEADER:     \ifnum\t=2 \node[blue!70!black] at (\c+0.5,#1-\r-0.5) {\v};\fi}\end{tikzpicture}}
+#+LATEX_HEADER: \lstset{
+#+LATEX_HEADER:   basicstyle=\ttfamily\small,
+#+LATEX_HEADER:   keywordstyle=\color{blue!70!black}\bfseries,
+#+LATEX_HEADER:   commentstyle=\color{green!45!black}\itshape,
+#+LATEX_HEADER:   stringstyle=\color{red!65!black},
+#+LATEX_HEADER:   backgroundcolor=\color{gray!8},
+#+LATEX_HEADER:   frame=single,
+#+LATEX_HEADER:   rulecolor=\color{gray!50},
+#+LATEX_HEADER:   breaklines=true,
+#+LATEX_HEADER:   showstringspaces=false
+#+LATEX_HEADER: }
+
+
+
+
+#+BEGIN_objectives
+- See why a naive recursion can be exponential, and fix it with memoization and a table.
+- Compare a greedy algorithm and dynamic programming on an optimization problem.
+- Apply backtracking to Sudoku, and count the nodes it visits.
+#+END_objectives
+
+* Exercise 1: Fibonacci, four ways
+
+$F(0) = 0$, $F(1) = 1$ and $F(n) = F(n-1) + F(n-2)$: 0, 1, 1, 2, 3, 5, 8, ...
+
+1. *Recursion.* Write =fib(n)= directly from the definition. Add a counter
+   of calls, and fill the table:
+
+   #+ATTR_LATEX: :align rrrr
+   | $n$ | $F(n)$ | Calls | Time |
+   |-----+--------+-------+------|
+   |  10 |        |       |      |
+   |  20 |        |       |      |
+   |  30 |        |       |      |
+   |  40 |        |       |      |
+
+   Compare the number of calls with $F(n+1)$. How does it grow?
+
+2. Draw the recursion tree of =fib(5)=. When computing =fib(10)=, how many
+   times is =fib(2)= computed? Count it with your program.
+
+3. *Memoization.* Add a memo (an array or a hash table) that stores each
+   value the first time it is computed. Count the calls for $n = 10$, $40$
+   and $90$.
+
+4. *Table, then two variables.* Write a version without recursion that
+   fills an array =f[0..n]= from left to right. Then notice that each
+   cell only uses the two previous ones, and write a version with two
+   variables. Give the time and memory complexity of the four versions.
+
+#+LATEX: \newpage
+* Exercise 2: The cheapest path
+
+A robot crosses a grid from the top left cell to the bottom right cell,
+moving only *right* or *down*. Each cell has a cost; the cost of a path is
+the sum of the cells it visits (both ends included). We want the cheapest
+path.
+
+#+BEGIN_EXPORT latex
+\begin{center}
+\costgrid{4}{2, 7, 1, 6, 1, 8, 1, 3, 5, 5, 3, 2, 4, 7, 4, 5}{}{white}
+\end{center}
+#+END_EXPORT
+
+1. *Greedy.* At each step, move to the cheaper of the two neighbours (on
+   the last row or column, there is only one choice). Apply it by hand to
+   the grid above, then implement it. What is its complexity?
+
+2. *Brute force.* How many paths are there in a $4 \times 4$ grid? In an
+   $n \times n$ grid? (A path makes $n - 1$ moves right and $n - 1$ moves
+   down.) Compute it for $n = 20$.
+
+3. *Dynamic programming.* Let $P[i][j]$ be the cost of the cheapest path
+   from the top left to the cell $(i, j)$. Write the recurrence (where can
+   we arrive from?), the base cases and the order of computation. Fill
+   the table $P$ by hand for the grid above.
+
+4. Implement it, and also return the cheapest path itself (walk back from
+   the bottom right cell). What is its complexity?
+
+5. Generate random $n \times n$ grids with costs from 1 to 9, for
+   $n = 100$ and $n = 1000$. On average, how much more expensive is the
+   greedy path than the cheapest one?
+
+#+LATEX: \newpage
+* Exercise 3: A simple Sudoku
+
+In a $4 \times 4$ Sudoku, each row, each column and each $2 \times 2$ box
+must contain the digits 1, 2, 3 and 4 exactly once. In the program, an
+empty cell holds 0.
+
+#+BEGIN_EXPORT latex
+\begin{center}
+\sudoku{4}{2}{0/0, 1/1, 0/0, 0/0, 0/0, 0/0, 0/0, 0/0, 2/1, 3/1, 1/1, 0/0, 0/0, 4/1, 0/0, 2/1}
+\end{center}
+#+END_EXPORT
+
+1. Solve it by hand.
+
+2. Write =canPlace(g, r, c, v)=: can the digit =v= go in the empty cell
+   $(r, c)$? Check its row, its column and its box. (The box of the cell
+   starts at row $r - r \bmod 2$ and column $c - c \bmod 2$.)
+
+3. Write =solve(g)= by backtracking: find the first empty cell; try the
+   digits 1 to 4 that can be placed; for each one, place it and solve the
+   rest; if the rest fails, empty the cell again and try the next digit.
+   If no digit works, return false. Solve the grid above and print it.
+
+4. Count the nodes visited (the calls of =solve=). Compare with the
+   number of ways to fill the 10 empty cells with digits from 1 to 4.
+
+5. Generalize your code to the $9 \times 9$ Sudoku (boxes of
+   $3 \times 3$), and solve this grid. How many nodes? How many ways to
+   fill the empty cells?
+
+   #+BEGIN_EXPORT latex
+   \begin{center}
+   \sudoku{9}{3}{0/0, 0/0, 0/0, 0/0, 0/0, 5/1, 4/1, 1/1, 0/0, 0/0, 0/0, 1/1, 8/1, 0/0, 0/0, 0/0, 0/0, 0/0, 0/0, 9/1, 5/1, 0/0, 0/0, 0/0, 0/0, 6/1, 2/1, 0/0, 7/1, 0/0, 0/0, 0/0, 4/1, 9/1, 0/0, 0/0, 0/0, 0/0, 0/0, 0/0, 7/1, 0/0, 0/0, 0/0, 0/0, 3/1, 0/0, 0/0, 6/1, 0/0, 0/0, 0/0, 0/0, 0/0, 1/1, 0/0, 8/1, 4/1, 0/0, 0/0, 7/1, 0/0, 5/1, 0/0, 6/1, 4/1, 0/0, 5/1, 0/0, 0/0, 3/1, 1/1, 0/0, 0/0, 0/0, 0/0, 1/1, 0/0, 0/0, 0/0, 0/0}
+   \end{center}
+   #+END_EXPORT
