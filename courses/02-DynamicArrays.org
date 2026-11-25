@@ -33,7 +33,7 @@
 #+LATEX_HEADER: \newcommand{\trow}[5]{\uncover<#1->{#2} & \uncover<#1->{#3} & \uncover<#1->{#4} & \uncover<#1->{#5}}
 
 #+LATEX_HEADER: \lstset{
-#+LATEX_HEADER:   basicstyle=\ttfamily\fontsize{5}{6}\selectfont,
+#+LATEX_HEADER:   basicstyle=\ttfamily\fontsize{7.5}{9}\selectfont,
 #+LATEX_HEADER:   keywordstyle=\color{blue!70!black}\bfseries,
 #+LATEX_HEADER:   commentstyle=\color{green!45!black}\itshape,
 #+LATEX_HEADER:   stringstyle=\color{red!65!black},
@@ -621,6 +621,7 @@ private void grow() {
 :PROPERTIES:
 :BEAMER_col: 0.64
 :END:
+#+ATTR_LATEX: :options basicstyle=\ttfamily\fontsize{5.5}{6.4}\selectfont
 #+begin_src java
 void add(int index, String value) {
     if (index < 0 || index > size) { // (1)
@@ -667,6 +668,7 @@ String remove(int index) {
 :PROPERTIES:
 :BEAMER_col: 0.66
 :END:
+#+ATTR_LATEX: :options basicstyle=\ttfamily\fontsize{6.5}{8}\selectfont
 #+begin_src java
 DynamicArray students = new DynamicArray();
 
