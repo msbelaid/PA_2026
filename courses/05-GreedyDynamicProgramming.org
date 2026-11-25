@@ -1,0 +1,956 @@
+#+TITLE: Greedy algorithms and dynamic programming
+#+AUTHOR: Mohammed Said BELAID @@latex:\\@@ said.belaid@univ-usto.dz @@latex:\\ \href{https://github.com/msbelaid}{github.com/msbelaid}@@
+#+SUBTITLE: Choosing well, and never solving the same problem twice
+#+DATE: 11/11/2026
+#+EMAIL: said.belaid@univ-usto.dz
+#+OPTIONS: H:2
+#+startup: beamer
+#+latex_header: \mode<beamer>{\usetheme{Antibes}}
+#+OPTIONS: listings:t
+#+LaTeX_CLASS: beamer
+#+LATEX_CLASS_OPTIONS: [aspectratio=169]
+#+LATEX_HEADER: \usepackage{listings}
+#+LATEX_HEADER: \usepackage{tikz}
+#+LATEX_HEADER: \usetikzlibrary{positioning, decorations.pathreplacing, calc}
+#+LATEX_HEADER: \tikzset{onslide/.code args={<#1>#2}{\only<#1>{\pgfkeysalso{#2}}}}
+#+LATEX_HEADER: \tikzset{alt/.code args={<#1>#2#3}{\alt<#1>{\pgfkeysalso{#2}}{\pgfkeysalso{#3}}}}
+#+LATEX_HEADER: \tikzset{invisible/.style={opacity=0}, visible on/.style={alt={#1{}{invisible}}}}
+#+LATEX_HEADER: % \cells{cell width}{y}{last index}: empty cells, with their index below
+#+LATEX_HEADER: \newcommand{\cells}[3]{\foreach \i in {0,...,#3} {\draw[fill=gray!8] (\i*#1,#2) rectangle ++(#1,0.6); \node[font=\tiny, gray] at (\i*#1+#1/2,#2-0.15) {\i};}}
+#+LATEX_HEADER: % \vals[fill]{cell width}{y}{index/value list}: filled cells
+#+LATEX_HEADER: \newcommand{\vals}[4][structure!15]{\foreach \i/\v in {#4} {\draw[fill=#1] (\i*#2,#3) rectangle ++(#2,0.6); \node[font=\scriptsize] at (\i*#2+#2/2,#3+0.3) {\v};}}
+#+LATEX_HEADER: % Nodes of recursion trees
+#+LATEX_HEADER: \tikzset{rnode/.style={draw, rounded corners=2pt, fill=gray!8, font=\tiny, inner sep=2pt, minimum height=0.4cm}}
+#+LATEX_HEADER: % 2D tables, in unit cells (scale the picture with x= and y=); row r spans y from -r to -r+1
+#+LATEX_HEADER: % \nrow[fill]{row}{column/text list}, \trow{row}{columns}: true cells, \frow{row}{columns}: false cells
+#+LATEX_HEADER: \newcommand{\nrow}[3][white]{\foreach \col/\txt in {#3} {\fill[#1] (\col,-#2) rectangle ++(1,1); \node[font=\scriptsize] at (\col+0.5,-#2+0.5) {\txt};}}
+#+LATEX_HEADER: \newcommand{\trow}[2]{\foreach \col in {#2} {\fill[green!25] (\col,-#1) rectangle ++(1,1); \node[font=\tiny] at (\col+0.5,-#1+0.5) {T};}}
+#+LATEX_HEADER: \newcommand{\frow}[2]{\foreach \col in {#2} {\fill[white] (\col,-#1) rectangle ++(1,1); \node[font=\tiny, gray] at (\col+0.5,-#1+0.5) {F};}}
+
+#+LATEX_HEADER: \lstset{
+#+LATEX_HEADER:   basicstyle=\ttfamily\fontsize{7.5}{9}\selectfont,
+#+LATEX_HEADER:   keywordstyle=\color{blue!70!black}\bfseries,
+#+LATEX_HEADER:   commentstyle=\color{green!45!black}\itshape,
+#+LATEX_HEADER:   stringstyle=\color{red!65!black},
+#+LATEX_HEADER:   backgroundcolor=\color{gray!8},
+#+LATEX_HEADER:   frame=single,
+#+LATEX_HEADER:   rulecolor=\color{gray!50},
+#+LATEX_HEADER:   breaklines=true,
+#+LATEX_HEADER:   showstringspaces=false
+#+LATEX_HEADER: }
+#+LaTeX_HEADER: \logo{\includegraphics[height=1cm]{../images/usto.png}}
+#+LATEX_HEADER: \usepackage{xcolor}
+#+LATEX_HEADER: \AtBeginSection[]{\begin{frame}<beamer>{Outline}\tableofcontents[currentsection]\end{frame}}
+
+
+
+* Optimization problems
+
+** What is an optimization problem?
+#+BEGIN_EXPORT latex
+\begin{block}{Optimization problem}
+Among all the \emph{candidate} solutions that satisfy the \emph{constraints}, find one that minimizes or maximizes an \emph{objective}.
+\end{block}
+#+END_EXPORT
+
+#+ATTR_LATEX: :align llll :font \small
+| Problem     | Candidates            | Constraint                     | Objective           |
+|-------------+-----------------------+--------------------------------+---------------------|
+| Knapsack    | subsets of objects    | total weight $\leq$ capacity   | max total value     |
+| Tour (TSP)  | orders of the clients | visit each client once         | min total distance  |
+| Coin change | collections of coins  | total $=$ amount               | min number of coins |
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- Three problems, followed through the whole course: greedy first, then dynamic programming.
+
+#+BEGIN_EXPORT latex
+\note{Until now, the problems of the course had one correct answer: find a key, sort an array. Here many solutions are correct, and we want the best one. Every optimization problem has the same three parts: what a candidate looks like, which candidates are allowed, and the number that measures a candidate. Ask students for other examples: a timetable with the fewest conflicts, the cheapest train journey, the best investment within a budget.}
+#+END_EXPORT
+
+** The knapsack problem
+A merchant can carry *50 kg*. Each sack of spices is taken *whole* or left.
+
+#+ATTR_LATEX: :align cccc
+| Sack | Weight | Value (1000 DA) | Value per kg |
+|------+--------+-----------------+--------------|
+| A    | 10 kg  |              60 |            6 |
+| B    | 20 kg  |             100 |            5 |
+| C    | 30 kg  |             120 |            4 |
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- Choose the sacks with the *largest total value* that fit in the bag.
+- Also: loading a truck, choosing projects within a budget, filling a disk with files.
+
+#+BEGIN_EXPORT latex
+\note{This is the 0/1 knapsack: each object is taken (1) or not (0), it cannot be cut. The values are in thousands of DA. Let students find the best choice by hand: A + B + C weighs 60 kg, too much; A + B gives 160, A + C gives 180, B + C gives 220 for exactly 50 kg. The best is B and C. With 3 sacks we can try everything; with 100 sacks, we cannot.}
+#+END_EXPORT
+
+** The delivery tour
+A van leaves the warehouse W, visits every client *once*, and comes back. Find the *shortest tour*.
+
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[city/.style={circle, draw, fill=structure!15, font=\tiny, inner sep=1.5pt, minimum size=0.5cm},
+    road/.style={gray!40}, dist/.style={font=\tiny, fill=white, inner sep=0.8pt}]
+  \draw[gray!25, dashed] (0,0) circle (1.9);
+  \node[city, fill=yellow!35] (W) at (250:1.9) {W};
+  \node[city] (A) at (290:1.9) {A}; \node[city] (C) at (40:1.9) {C}; \node[city] (B) at (200:1.9) {B};
+  \foreach \x/\y in {W/A, W/B, W/C, A/B, A/C, B/C} {\draw[road] (\x) -- (\y);}
+  \path (W) -- node[dist] {3} (A);  \path (W) -- node[dist] {4} (B);
+  \path (W) -- node[dist, pos=0.72] {10} (C); \path (A) -- node[dist, pos=0.28] {7} (B);
+  \path (A) -- node[dist] {8} (C);  \path (B) -- node[dist] {10} (C);
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- The *travelling salesman problem* (TSP): deliveries, school buses, drilling circuit boards, ...
+
+#+BEGIN_EXPORT latex
+\note{This is the delivery tour announced in course 04. The clients are on a circle of radius 5 km around the town center; the distances are straight lines, rounded to the km (in km). With 3 clients there are 3! = 6 orders, that is 3 different tours, each one in two directions. Let students compute one or two tours. We will find the best one later in the course.}
+#+END_EXPORT
+
+** Coin change
+Coins: 200, 100, 50, 20, 10 and 5 DA. Give back *290 DA* with the *fewest coins*.
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- Each kind of coin can be used *several times*.
+- Other coin systems exist: with coins of 1, 3 and 4, pay 6.
+- Also: cash machines, vending machines, stamps, packs of products.
+
+#+BEGIN_EXPORT latex
+\note{Every student knows how to do it: 200 + 50 + 20 + 20, 4 coins. Do not discuss the method yet: the next section is about this reflex. The coins 1, 3, 4 look artificial, but they will show that the reflex can fail. Amounts are multiples of 5 DA.}
+#+END_EXPORT
+
+** Brute force: how many candidates?
+#+ATTR_LATEX: :align lll
+| Problem                 | Candidates                | Brute force          |
+|-------------------------+---------------------------+----------------------|
+| Knapsack, $n$ objects   | every subset              | $2^n$                |
+| Tour, $n$ clients       | every order               | $n!$                 |
+| Coin change, amount $a$ | every sequence of coins   | exponential in $a$   |
+
+\pause
+#+ATTR_LATEX: :align rrrrr
+| $n$ | $2^n$              | time      | $n!$                 | time                 |
+|-----+--------------------+-----------+----------------------+----------------------|
+|  10 | $10^3$             | 1 @@latex:$\mu$@@s | $3.6 \cdot 10^6$     | 4 ms                 |
+|  20 | $10^6$             | 1 ms      | $2.4 \cdot 10^{18}$  | 77 years             |
+|  30 | $10^9$             | 1 s       | $2.7 \cdot 10^{32}$  | $10^{16}$ years      |
+|  60 | $1.2 \cdot 10^{18}$ | 36 years | $8.3 \cdot 10^{81}$  |                      |
+
+\pause
+- The three problems are *NP-hard*: no polynomial algorithm is known.
+
+#+BEGIN_EXPORT latex
+\note{The times assume one billion candidates per second. For the coins, the recursion that tries every first coin makes 2.3 times 10 to the power 14 calls for 290 DA with the DA coins, about 3 days, although there are only 913 different ways to pay 290 DA. NP-hard does not mean that every instance is hard: we will see that the knapsack and the coins are easy when the capacity or the amount is small. Two ways out: give up the guarantee and be fast (greedy), or be clever and avoid repeated work (dynamic programming).}
+#+END_EXPORT
+
+* Greedy algorithms
+
+** What is a greedy algorithm?
+#+BEGIN_EXPORT latex
+\begin{block}{Greedy algorithm}
+A greedy algorithm builds the solution step by step. At each step, it makes the choice that looks the \emph{best now}, and never changes it.
+\end{block}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- No exploration, no going back: usually a sort and a loop, so *fast*.
+- *Simple* to write.
+- But the best local choice does not always lead to the best solution: a greedy algorithm needs a *proof* (or a counterexample).
+
+#+BEGIN_EXPORT latex
+\note{Compare with brute force: brute force looks at every candidate, a greedy algorithm looks at only one, built choice by choice. When it works, it is the fastest possible approach. The difficulty is not to write it, but to know whether it is correct. We now apply the idea to the three problems: for each one, what is the "best now" choice?}
+#+END_EXPORT
+
+** Greedy knapsack: which choice?
+#+ATTR_LATEX: :align lll
+| Order                   | Taken                         | Value |
+|-------------------------+-------------------------------+-------|
+| most valuable first     | C, then B                     |   220 |
+| lightest first          | A, B (C no longer fits)       |   160 |
+| best value per kg first | A, B (C no longer fits)       |   160 |
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- The best is 220 (B and C): only "most valuable first" finds it, here.
+- But it fails too: one sack of 50 kg worth 200, two sacks of 25 kg worth 150 each.
+- One counterexample is enough to reject a rule.
+
+#+BEGIN_EXPORT latex
+\note{Let students propose rules before showing the table. Each rule takes the sacks in its order, and skips a sack that no longer fits. Most valuable first: C (30 kg), then B (20 kg), the bag is full. In the counterexample, it takes the sack worth 200 and the bag is full, while the two small sacks give 300. The weight alone and the value alone are not good criteria: what matters is what each kilogram brings, the value per kg. Is it the right rule?}
+#+END_EXPORT
+
+** Best value per kg first
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[x=0.12cm, y=0.6cm, seg/.style={draw, rounded corners=1pt}]
+  \node[font=\scriptsize, anchor=east] at (-1,0.5) {greedy};
+  \draw[seg, fill=gray!8] (0,0) rectangle (50,1);
+  \begin{scope}[visible on=<2->] \draw[seg, fill=green!25] (0,0) rectangle (10,1); \node[font=\tiny] at (5,0.5) {A}; \end{scope}
+  \begin{scope}[visible on=<3->] \draw[seg, fill=green!25] (10,0) rectangle (30,1); \node[font=\tiny] at (20,0.5) {B}; \end{scope}
+  \begin{scope}[visible on=<4->] \node[font=\tiny, gray] at (40,0.5) {20 kg empty}; \node[font=\scriptsize, anchor=west] at (52,0.5) {160}; \end{scope}
+  \begin{scope}[visible on=<5->]
+    \node[font=\scriptsize, anchor=east] at (-1,-1) {best};
+    \draw[seg, fill=green!25] (0,-1.5) rectangle (20,-0.5); \node[font=\tiny] at (10,-1) {B};
+    \draw[seg, fill=green!25] (20,-1.5) rectangle (50,-0.5); \node[font=\tiny] at (35,-1) {C};
+    \node[font=\scriptsize, anchor=west] at (52,-1) {220};
+  \end{scope}
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <5->
+- After A and B, C (30 kg) no longer fits: 20 kg stay empty. Taking A was a mistake.
+- No greedy rule is always optimal for the 0/1 knapsack.
+
+#+BEGIN_EXPORT latex
+\note{Step by step: A has the best value per kg (6), take it, 40 kg left. Then B (5): take it, 20 kg left. C needs 30 kg: skip it. The best value per kg is the right idea locally, but A uses 10 kg that would have been better used by C. This is a general fact: nobody knows a fast rule that is always right for the 0/1 knapsack, since the problem is NP-hard.}
+#+END_EXPORT
+
+** Greedy tour: nearest client first
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[city/.style={circle, draw, fill=structure!15, font=\tiny, inner sep=1.5pt, minimum size=0.5cm},
+    road/.style={gray!40}, dist/.style={font=\tiny, fill=white, inner sep=0.8pt},
+    leg/.style={->, very thick, orange!80!black, shorten >=1pt, shorten <=1pt},
+    best/.style={->, very thick, green!50!black, shorten >=1pt, shorten <=1pt}]
+  \foreach \s/\dx in {L/0, R/7} {
+    \begin{scope}[xshift=\dx cm]
+      \draw[gray!25, dashed] (0,0) circle (1.9);
+      \node[city, fill=yellow!35] (W\s) at (250:1.9) {W};
+      \node[city] (A\s) at (290:1.9) {A}; \node[city] (C\s) at (40:1.9) {C}; \node[city] (B\s) at (200:1.9) {B};
+      \foreach \x/\y in {W/A, W/B, W/C, A/B, A/C, B/C} {\draw[road] (\x\s) -- (\y\s);}
+    \end{scope}}
+  \begin{scope}[visible on=<2->] \draw[leg] (WL) -- (AL); \end{scope}
+  \begin{scope}[visible on=<3->] \draw[leg] (AL) -- (BL); \end{scope}
+  \begin{scope}[visible on=<4->] \draw[leg] (BL) -- (CL); \end{scope}
+  \begin{scope}[visible on=<5->] \draw[leg] (CL) -- (WL); \end{scope}
+  \begin{scope}[visible on=<6->]
+    \draw[best] (WR) -- (AR); \draw[best] (AR) -- (CR); \draw[best] (CR) -- (BR); \draw[best] (BR) -- (WR);
+    \node[font=\scriptsize] at (7,-2.5) {around the circle};
+  \end{scope}
+  \foreach \s in {L, R} {
+    \path (W\s) -- node[dist] {3} (A\s);  \path (W\s) -- node[dist] {4} (B\s);
+    \path (W\s) -- node[dist, pos=0.72] {10} (C\s); \path (A\s) -- node[dist, pos=0.28] {7} (B\s);
+    \path (A\s) -- node[dist] {8} (C\s);  \path (B\s) -- node[dist] {10} (C\s);}
+  \node[font=\scriptsize] at (0,-2.5) {nearest client first};
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <6->
+- Greedy: $3 + 7 + 10 + 10 = 30$ km. Around the circle: $3 + 8 + 10 + 4 = 25$ km.
+- The greedy tour crosses itself. A greedy *heuristic*: fast, with no guarantee.
+
+#+BEGIN_EXPORT latex
+\note{Ask students what a driver would do without a computer: go to the closest client, then the closest one from there, and so on. This is the nearest neighbour heuristic. Step by step: from W, A is the nearest (3 km, B is 4). From A, B is 7 km and C is 8 km: go to B. Only C is left (10 km), then back to W (10 km). The two long legs at the end are the price of the cheap choices at the beginning. In the plane, a tour that crosses itself can always be shortened, by reversing the part between the two crossing roads; this is how many delivery programs improve a greedy tour. On random cities, the nearest neighbour tour is typically about 25 percent longer than the best one.}
+#+END_EXPORT
+
+** Greedy change: the largest coin first
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[coin/.style={circle, draw, fill=yellow!35, font=\scriptsize, minimum size=0.85cm}]
+  \node[font=\small] at (-1.6,0) {290 DA};
+  \begin{scope}[visible on=<2->] \node[coin] at (0,0) {200}; \node[font=\tiny, gray] at (0,-0.7) {90 left}; \end{scope}
+  \begin{scope}[visible on=<3->] \node[coin] at (1.2,0) {50}; \node[font=\tiny, gray] at (1.2,-0.7) {40 left}; \end{scope}
+  \begin{scope}[visible on=<4->] \node[coin] at (2.4,0) {20}; \node[font=\tiny, gray] at (2.4,-0.7) {20 left}; \end{scope}
+  \begin{scope}[visible on=<5->] \node[coin] at (3.6,0) {20}; \node[font=\tiny, gray] at (3.6,-0.7) {0 left}; \end{scope}
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+begin_src java
+// coins in decreasing order, for example {200, 100, 50, 20, 10, 5}
+List<Integer> change(int amount, int[] coins) {
+    List<Integer> used = new ArrayList<>();
+    for (int c : coins)
+        while (amount >= c) {           // the largest coin that fits
+            amount -= c;
+            used.add(c);
+        }
+    return used;
+}
+#+end_src
+
+#+BEGIN_EXPORT latex
+\uncover<6->{\begin{itemize}\item $O(k + \text{number of coins given})$, with $k$ kinds of coins. 4 coins: optimal.\end{itemize}}
+\note{This is what every cashier does, without thinking: at each step, the largest coin that fits. The loop takes as many coins of each value as possible, starting with the largest. With an amount that is not a multiple of the smallest coin, the method stops with a remainder; a real version would check that amount is 0 at the end. The number of coins can also be computed with divisions: amount / c coins of value c, then amount \% c. Ask: is it always the best?}
+#+END_EXPORT
+
+** Strange coins
+Coins: 1, 3 and 4. Pay 6.
+
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[coin/.style={circle, draw, fill=yellow!35, font=\scriptsize, minimum size=0.75cm}]
+  \node[font=\small, anchor=east] at (-0.6,0) {greedy:};
+  \node[coin] at (0,0) {4}; \node[coin] at (1,0) {1}; \node[coin] at (2,0) {1};
+  \node[font=\small, anchor=west] at (2.6,0) {3 coins};
+  \begin{scope}[visible on=<2->]
+    \node[font=\small, anchor=east] at (-0.6,-1.1) {best:};
+    \node[coin, fill=green!25] at (0,-1.1) {3}; \node[coin, fill=green!25] at (1,-1.1) {3};
+    \node[font=\small, anchor=west] at (2.6,-1.1) {2 coins};
+  \end{scope}
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <3->
+- Taking the 4 looks best now, but it forces two coins of 1 afterwards.
+- The greedy choice is *never revised*: here, it is a mistake.
+- With the DA coins greedy is optimal, but this depends on the values of the coins.
+
+#+BEGIN_EXPORT latex
+\note{This is not only a puzzle. The British coins before 1971 included 1, 3, 6, 12, 24 and 30 pence: for 48 pence, greedy gives 30 + 12 + 6, three coins, while 24 + 24 needs two. The same happens with stamps, packs of products, ... The systems where greedy is always optimal are called canonical; the DA coins and the euro coins are canonical, but each system must be checked. To be sure, we must consider every possible first coin: this is the subject of the next section.}
+#+END_EXPORT
+
+** Greedy: fast, but not always optimal
+#+ATTR_LATEX: :align llll
+| Problem     | Brute force           | Greedy                       | On our example        |
+|-------------+-----------------------+------------------------------+-----------------------|
+| Knapsack    | $2^n$                 | $O(n \log n)$                | 160 instead of 220    |
+| Tour        | $n!$                  | $O(n^2)$                     | 30 km instead of 25   |
+| Coin change | exponential in $a$    | $O(k + \text{coins given})$  | DA: optimal           |
+|             |                       |                              | 1, 3, 4: 3 coins, not 2 |
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- Greedy is optimal only with a *proof*: for example, canonical coins.
+- Otherwise: a fast *heuristic*, often good, never guaranteed.
+
+#+BEGIN_EXPORT latex
+\note{Summarize with the students: on every problem greedy is very fast, polynomial where brute force is exponential. But it is optimal only in special cases, and we must prove it. When we cannot prove it, greedy is still useful: as a first solution, as a bound, or when an approximate answer is enough. When the exact best answer is needed, we need another idea.}
+#+END_EXPORT
+
+** Exercise: greedy or not?
+1. Coins 1, 10 and 25: pay 30 with the greedy algorithm. Is it the fewest coins?
+2. A car drives 300 km on a full tank. There are gas stations at km 150, 280, 350, 500 and 620; the destination is at km 700. Which greedy rule gives the fewest stops? Apply it.
+
+#+BEGIN_EXPORT latex
+\note{Answers. 1. Greedy: 25 + 1 + 1 + 1 + 1 + 1, six coins; the best is 10 + 10 + 10, three coins. These were the American coins without the 5 cents. 2. Drive as far as possible: stop at the last station you can reach. From km 0 you reach km 300, so stop at 280; from 280 you reach 580, so stop at 500; from 500 you reach 800, past the destination. Two stops. It is optimal: any other first stop is earlier, so it can only reach less far.}
+#+END_EXPORT
+
+* Dynamic programming
+
+** What is dynamic programming?
+#+BEGIN_EXPORT latex
+\begin{block}{Dynamic programming}
+Solve each subproblem \emph{once}, store its result in a table, and build the solutions of bigger subproblems from the solutions of smaller ones.
+\end{block}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- Like brute force, it tries *every choice*: the answer is exact.
+- But the same subproblems come back many times: it solves each one *only once*.
+- Two conditions: *optimal substructure* and *overlapping subproblems*.
+
+#+BEGIN_EXPORT latex
+\note{Optimal substructure: the best solution is built from the best solutions of subproblems (the best way to pay 6, without its first coin, is a best way to pay what remains). Overlapping subproblems: the same subproblems appear many times, otherwise the table is useless and divide and conquer is enough. Richard Bellman chose the name in the 1950s: programming means planning, filling a table, as in linear programming, not writing code; he also said he chose a name that sounded impressive to the people who funded his research. Before the optimization problems, the simplest example: Fibonacci.}
+#+END_EXPORT
+
+** Back to Fibonacci
+#+begin_src java
+long fib(int n) {
+    if (n <= 1) return n;
+    return fib(n - 1) + fib(n - 2);
+}
+#+end_src
+
+\pause
+#+ATTR_LATEX: :align rrr
+| $n$ | calls to =fib= | different values |
+|-----+----------------+------------------|
+|  10 |            177 |               11 |
+|  30 |      2 692 537 |               31 |
+|  50 | 40 730 022 147 |               51 |
+
+\pause
+- Only $n + 1$ different subproblems: =fib(0)=, ..., =fib(n)=.
+- But an *exponential* number of calls: the same values are computed again and again.
+
+#+BEGIN_EXPORT latex
+\note{Start from the open question of the last course, and the answers students gave. The number of calls is 2 fib(n + 1) - 1: it grows like the Fibonacci numbers themselves, about 1.6 to the power n. At about one billion calls per second, fib(50) takes tens of seconds, for a value that a loop computes with about 50 additions. Ask: how many of these calls are really needed? One per different value.}
+#+END_EXPORT
+
+** Overlapping subproblems
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[level distance=0.55cm,
+    level 1/.style={sibling distance=5.2cm}, level 2/.style={sibling distance=2.6cm},
+    level 3/.style={sibling distance=1.3cm}, level 4/.style={sibling distance=0.7cm},
+    edge from parent/.style={draw, gray}, every node/.style={rnode},
+    f3/.style={fill=orange!45}, f2/.style={fill=green!25}]
+  \node {f(5)}
+    child {node {f(4)}
+      child {node[f3] {f(3)} child {node[f2] {f(2)} child {node {f(1)}} child {node {f(0)}}} child {node {f(1)}}}
+      child {node[f2] {f(2)} child {node {f(1)}} child {node {f(0)}}}}
+    child {node[f3] {f(3)}
+      child {node[f2] {f(2)} child {node {f(1)}} child {node {f(0)}}}
+      child {node {f(1)}}};
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- Merge sort: the two halves are *disjoint*, no subproblem is ever solved twice.
+- Fibonacci: =f(4)= and =f(3)= both need =f(2)=: the subproblems *overlap*.
+- The idea: solve each subproblem *once*, store its result, and reuse it.
+
+#+BEGIN_EXPORT latex
+\note{This is the difference with divide and conquer: in merge sort, the left half and the right half have nothing in common, so storing their results would be useless. Here the same small subproblems appear in many branches: f(3) twice, f(2) three times. Solving each subproblem once and storing the result is the idea of dynamic programming.}
+#+END_EXPORT
+
+** Memoization: remember the results
+#+begin_src java
+Map<Integer, Long> memo = new HashMap<>();
+
+long fib(int n) {
+    if (n <= 1) return n;
+    if (memo.containsKey(n)) return memo.get(n);   // already computed
+    long result = fib(n - 1) + fib(n - 2);
+    memo.put(n, result);                            // remember it
+    return result;
+}
+#+end_src
+
+\pause
+- Same recursion, plus a *memo*: a hash table from $n$ to =fib(n)= (course 01).
+- Before computing, look in the memo; after computing, store the result.
+
+#+BEGIN_EXPORT latex
+\note{Memoization (from memo, a note to remember, not memorization) is the simplest way to apply the idea: the recursive code does not change, we only add a lookup at the beginning and a store at the end. A hash table works for any kind of key; here the keys are 0 to n, so an array of size n + 1 would also work, with a special value for "not computed yet". Careful: a long overflows after fib(92).}
+#+END_EXPORT
+
+** The calls with memoization
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[every node/.style={rnode}, line/.style={gray}, known/.style={fill=green!25}]
+  \node (a5) at (4,0) {f(5)};
+  \node (a4) at (3,-0.6) {f(4)}; \node[known] (b3) at (5,-0.6) {f(3)};
+  \node (a3) at (2,-1.2) {f(3)}; \node[known] (b2) at (4,-1.2) {f(2)};
+  \node (a2) at (1,-1.8) {f(2)}; \node (b1) at (3,-1.8) {f(1)};
+  \node (a1) at (0,-2.4) {f(1)}; \node (b0) at (2,-2.4) {f(0)};
+  \foreach \p/\c in {a5/a4, a5/b3, a4/a3, a4/b2, a3/a2, a3/b1, a2/a1, a2/b0} {\draw[line] (\p) -- (\c);}
+  \node[draw=none, fill=none, font=\scriptsize, anchor=west] at (5.6,-0.6) {found in the memo};
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- Each value is computed *once*: $2n - 1$ calls, $O(n)$ time.
+- =fib(50)=: 99 calls instead of $4 \cdot 10^{10}$.
+- Memory: the memo, $O(n)$, and a call stack of depth $n$.
+
+#+BEGIN_EXPORT latex
+\note{Follow the calls: f(5) calls f(4), which calls f(3), then f(2), then f(1) and f(0), which are base cases. When f(4) then asks for f(2), the value is already in the memo: the call returns at once, without children. Same for f(3) in f(5). The tree becomes a single path, plus one leaf per level. Ask: what happens for fib(100000)? The stack is too deep: StackOverflowError (course 04). The next solution avoids recursion.}
+#+END_EXPORT
+
+** Bottom-up: fill a table
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}
+  \cells{0.6}{0}{10}
+  \begin{scope}[visible on=<2->] \vals{0.6}{0}{0/0, 1/1} \end{scope}
+  \begin{scope}[visible on=<3->] \vals[green!25]{0.6}{0}{2/1} \end{scope}
+  \begin{scope}[visible on=<4->] \vals[green!25]{0.6}{0}{3/2} \end{scope}
+  \begin{scope}[visible on=<5->] \vals[green!25]{0.6}{0}{4/3} \end{scope}
+  \begin{scope}[visible on=<6->] \vals[green!25]{0.6}{0}{5/5} \end{scope}
+  \begin{scope}[visible on=<7->] \vals[green!25]{0.6}{0}{6/8} \end{scope}
+  \begin{scope}[visible on=<8->] \vals[green!25]{0.6}{0}{7/13} \end{scope}
+  \begin{scope}[visible on=<9->] \vals[green!25]{0.6}{0}{8/21} \end{scope}
+  \begin{scope}[visible on=<10->] \vals[green!25]{0.6}{0}{9/34} \end{scope}
+  \begin{scope}[visible on=<11->] \vals[green!25]{0.6}{0}{10/55} \end{scope}
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+begin_src java
+long fib(int n) {
+    long[] f = new long[n + 1];
+    f[0] = 0;
+    if (n > 0) f[1] = 1;
+    for (int i = 2; i <= n; i++)
+        f[i] = f[i - 1] + f[i - 2];     // both already in the table
+    return f[n];
+}
+#+end_src
+
+#+BEGIN_EXPORT latex
+\note{Instead of starting from n and going down, start from the base cases and go up: when we compute f[i], the two cells it needs are already filled. No recursion, no memo lookups, no stack: a simple loop, O(n) time and O(n) memory. The test n > 0 avoids writing f[1] in an array of size 1.}
+#+END_EXPORT
+
+** Two variables are enough
+#+begin_src java
+long fib(int n) {
+    if (n == 0) return 0;
+    long prev = 0, cur = 1;            // f(i - 1) and f(i), for i = 1
+    for (int i = 2; i <= n; i++) {
+        long next = prev + cur;
+        prev = cur;
+        cur = next;
+    }
+    return cur;
+}
+#+end_src
+
+\pause
+#+ATTR_LATEX: :align lll
+| Version         | Time         | Memory   |
+|-----------------+--------------+----------|
+| recursive       | $O(1.6^n)$   | $O(n)$   |
+| memoization     | $O(n)$       | $O(n)$   |
+| table           | $O(n)$       | $O(n)$   |
+| two variables   | $O(n)$       | $O(1)$   |
+
+#+BEGIN_EXPORT latex
+\note{Each cell of the table only uses the two cells before it: once f[i] is computed, f[i - 2] is never read again. We can keep only the last two values. This is frequent in dynamic programming: the table is a tool to think, and the final code often keeps only one or two rows of it. The memory of the recursive version is the depth of the stack.}
+#+END_EXPORT
+
+** The method
+#+ATTR_BEAMER: :overlay <+(1)->
+1. *Subproblem*: what does $T[i]$ mean?
+2. *Recurrence*: $T[i]$ from smaller subproblems.
+3. *Base cases*: the subproblems solved directly.
+4. *Order*: each cell needs only cells already filled.
+5. *Answer*: which cell (or the best of all cells)?
+
+#+BEGIN_EXPORT latex
+\note{For Fibonacci: T[i] is fib(i); T[i] = T[i - 1] + T[i - 2]; T[0] = 0 and T[1] = 1; increasing i; the answer is T[n]. Step 1 is the hard one: once the meaning of a cell is clear, the recurrence is often easy to write. Always write that sentence, in a comment above the table. We now apply the method to the three problems of the course.}
+#+END_EXPORT
+
+* Back to the coins
+
+** Trying every first coin
+$\text{coins}(a)$: the fewest coins to pay the amount $a$.
+\[ \text{coins}(a) = 1 + \min_{c \,\leq\, a} \text{coins}(a - c), \qquad \text{coins}(0) = 0 \]
+
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[every node/.style={rnode}, line/.style={gray}, rep/.style={onslide=<2->{fill=orange!45}}]
+  \node (r) at (4,0) {6};
+  \node (a) at (1.5,-0.55) {5}; \node (b) at (5,-0.55) {3}; \node[rep] (c) at (7.5,-0.55) {2};
+  \node (a1) at (0.3,-1.1) {4}; \node[rep] (a2) at (1.5,-1.1) {2}; \node (a3) at (2.7,-1.1) {1};
+  \node[rep] (b1) at (4.4,-1.1) {2}; \node (b2) at (5.6,-1.1) {0};
+  \node (c1) at (7.5,-1.1) {1};
+  \foreach \p/\c in {r/a, r/b, r/c, a/a1, a/a2, a/a3, b/b1, b/b2, c/c1} {\draw[line] (\p) -- (\c);}
+  \node[draw=none, fill=none] at (4,-1.55) {$\vdots$};
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <2->
+- After two coins, the amount 2 already appears *three times*: overlapping subproblems.
+- Only $a + 1$ different subproblems: $\text{coins}(0), \dots, \text{coins}(a)$.
+
+#+BEGIN_EXPORT latex
+\note{Coins 1, 3 and 4, as in the greedy section. The recurrence tries every coin c for the first coin, then pays the rest a - c in the best possible way: no coin is chosen blindly, so the answer is exact. This is brute force written as a recursion, and its tree grows exponentially with a: 24 calls for 6, 3.9 times 10 to the power 10 for 50. Like Fibonacci, the different subproblems are few: one per amount from 0 to a. We know what to do: solve each one once.}
+#+END_EXPORT
+
+** Coin change: the table
+$T[a]$: the fewest coins to pay $a$, with the coins 1, 3, 4.
+
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}
+  \cells{0.9}{0}{6}
+  \begin{scope}[visible on=<2->] \vals{0.9}{0}{0/0} \end{scope}
+  \begin{scope}[visible on=<3->] \vals[green!25]{0.9}{0}{1/1} \end{scope}
+  \begin{scope}[visible on=<4->] \vals[green!25]{0.9}{0}{2/2} \end{scope}
+  \begin{scope}[visible on=<5->] \vals[green!25]{0.9}{0}{3/1} \end{scope}
+  \begin{scope}[visible on=<6->] \vals[green!25]{0.9}{0}{4/1} \end{scope}
+  \begin{scope}[visible on=<7->] \vals[green!25]{0.9}{0}{5/2} \end{scope}
+  \begin{scope}[visible on=<8->]
+    \vals[orange!45]{0.9}{0}{6/2}
+    \draw[->, orange!80!black, thick] (4.95,0.65) to[bend left=60] node[above, font=\tiny] {1} (5.85,0.65);
+    \draw[->, orange!80!black, thick] (3.15,0.65) to[bend left=45] node[above, font=\tiny] {3} (5.75,0.7);
+    \draw[->, orange!80!black, thick] (2.25,0.65) to[bend left=40] node[above, font=\tiny] {4} (5.65,0.75);
+  \end{scope}
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <8->
+- $T[6] = 1 + \min(T[5], T[3], T[2]) = 1 + \min(2, 1, 2) = 2$.
+- Order: increasing amounts. Answer: $T[6]$.
+
+#+BEGIN_EXPORT latex
+\note{Fill the cells with the students, one by one. T[0] = 0: the base case. T[1] = 1 + T[0]. T[2] = 1 + T[1], only the coin 1 fits. T[3] = 1 + min(T[2], T[0]) = 1. T[4] = 1 + min(T[3], T[1], T[0]) = 1. T[5] = 1 + min(T[4], T[2], T[1]) = 2. T[6] = 1 + min(T[5], T[3], T[2]) = 2: the arrows show the three cells used, one per coin. Each cell only looks to its left: filling from left to right is the right order.}
+#+END_EXPORT
+
+** Coin change: the code
+#+begin_src java
+// t[a]: the fewest coins to pay a (INF if a cannot be paid)
+int minCoins(int amount, int[] coins) {
+    final int INF = Integer.MAX_VALUE;
+    int[] t = new int[amount + 1];
+    t[0] = 0;
+    for (int a = 1; a <= amount; a++) {
+        t[a] = INF;
+        for (int c : coins)
+            if (c <= a && t[a - c] != INF)
+                t[a] = Math.min(t[a], t[a - c] + 1);
+    }
+    return t[amount];
+}
+#+end_src
+
+\pause
+- $O(a \times k)$ time, $O(a)$ memory, for an amount $a$ and $k$ kinds of coins.
+- Optimal for *any* coin system, where greedy is optimal only for canonical ones.
+
+#+BEGIN_EXPORT latex
+\note{The comment on the first line is step 1 of the method: always write it. The test t[a - c] != INF is needed because some amounts cannot be paid (with the coins 3 and 4 only, 5 cannot), and INF + 1 would overflow into a negative number. For 290 DA with the 6 DA coins: 290 times 6 = 1740 operations, instead of 2.3 times 10 to the power 14 calls for the recursion. Slower than greedy, but always right.}
+#+END_EXPORT
+
+** Which coins?
+The table gives the number of coins. To know *which* coins, remember the choice:
+
+#+begin_src java
+            if (c <= a && t[a - c] != INF && t[a - c] + 1 < t[a]) {
+                t[a] = t[a - c] + 1;
+                last[a] = c;             // the last coin used to pay a
+            }
+// ...
+for (int a = amount; a > 0; a -= last[a])
+    System.out.println(last[a]);        // 6: prints 3, then 3
+#+end_src
+
+\pause
+- Same cost; one more table. Common in dynamic programming: store the *value* and the *choice*.
+
+#+BEGIN_EXPORT latex
+\note{last[6] = 3, because T[3] + 1 = 2 is the best; then we must pay 6 - 3 = 3, and last[3] = 3; then 0 is left. We walk back from the answer to the base case, following the choices: the same idea gives the sacks of the knapsack in the next section.}
+#+END_EXPORT
+
+** Top-down or bottom-up?
+#+ATTR_LATEX: :align lll
+|          | Top-down (memoization)       | Bottom-up (table)          |
+|----------+------------------------------+----------------------------|
+| Code     | the recursion, plus a memo   | loops that fill a table    |
+| Computes | only the needed subproblems  | every subproblem           |
+| Order    | automatic                    | must be chosen             |
+| Stack    | depth up to the problem size | none                       |
+| Memory   | the whole memo               | can keep only the last row |
+
+\pause
+- Same idea, same cost in most cases.
+- Start with the recursion (easy to find), add a memo, then turn it into loops if needed.
+
+#+BEGIN_EXPORT latex
+\note{Top-down is the natural way when the recurrence comes first: the code is the recurrence, and the order is found by the recursion itself. It wins when many subproblems are never needed. Bottom-up wins for large problems: no stack overflow, no hash table, and the possibility to keep only the last values (Fibonacci with two variables). The knapsack follows exactly this path: recursion, then table.}
+#+END_EXPORT
+
+* Back to the knapsack
+
+** The knapsack, recursively
+$\text{best}(i, c)$: the best value with the *first $i$ sacks* and a capacity of $c$ kg.
+
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[box/.style={draw, rounded corners=2pt, fill=gray!8, font=\scriptsize, inner sep=3pt},
+    lab/.style={font=\tiny, fill=white, inner sep=1pt}, line/.style={->, gray, thick}]
+  \node[box] (r) at (0,0) {$\text{best}(i, c)$};
+  \node[box] (s) at (-3,-1.3) {$\text{best}(i-1,\ c)$};
+  \node[box, fill=green!25] (t) at (3,-1.3) {$v_i + \text{best}(i-1,\ c - w_i)$};
+  \draw[line] (r) -- node[lab, above left] {skip sack $i$} (s);
+  \draw[line] (r) -- node[lab, above right] {take sack $i$, if $w_i \leq c$} (t);
+  \node[font=\scriptsize] at (0,-1.3) {$\max$};
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- Look at the last sack $i$ (weight $w_i$, value $v_i$): skip it, or take it and lose $w_i$ kg of capacity. Keep the best.
+- Base case: with no sack, $\text{best}(0, c) = 0$. Answer: $\text{best}(n, \text{capacity})$.
+- Example: $\text{best}(3, 50) = \max(160,\ 120 + 100) = 220$: skip or take C.
+- Two choices per sack: up to $2^n$ calls.
+
+#+BEGIN_EXPORT latex
+\note{This is the same take or skip choice as the recursion of subset sum in course 04, with values instead of true and false: subset sum is the special case where the value of an object is its weight. Unlike greedy, both choices are tried for every sack: the answer is exact. The sack considered is the last of the first i: after the choice, the subproblem only has the first i - 1 sacks, with the same capacity (skip) or c - w kg (take). With A, B, C and 50 kg: skipping C leaves A and B with 50 kg, 160; taking C (120) leaves A and B with 20 kg, 100. Ask: what is best(2, 20)? B alone, 100. Each call makes up to two calls, and the depth is n: up to 2 to the power n calls.}
+#+END_EXPORT
+
+** Repeated calls
+Three sacks of 1 kg, a capacity of 2 kg: the calls $(i, c)$.
+
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[level distance=0.6cm,
+    level 1/.style={sibling distance=5cm}, level 2/.style={sibling distance=2.5cm},
+    level 3/.style={sibling distance=1.1cm},
+    edge from parent/.style={draw, gray}, every node/.style={rnode}, rep/.style={onslide=<2->{fill=orange!45}}]
+  \node {(3,2)}
+    child {node {(2,2)}
+      child {node {(1,2)} child {node {(0,2)}} child {node {(0,1)}}}
+      child {node[rep] {(1,1)} child {node {(0,1)}} child {node {(0,0)}}}}
+    child {node {(2,1)}
+      child {node[rep] {(1,1)} child {node {(0,1)}} child {node {(0,0)}}}
+      child {node {(1,0)} child {node {(0,0)}}}};
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <2->
+- A call depends only on $(i, c)$: at most $(n + 1)(\text{capacity} + 1)$ different calls.
+- 40 sacks, 1000 kg: $2^{40} \approx 10^{12}$ calls, but only $4 \cdot 10^4$ different ones.
+- Overlapping subproblems: a memo =memo[i][c]=, or a table.
+
+#+BEGIN_EXPORT latex
+\note{Left branch: skip sack 3; right branch: take it. After skipping one sack and taking another, or the opposite, we reach the same call (1, 1): the same sacks are left, with the same capacity. With real data the repetitions are massive: by the pigeonhole principle, 10 to the power 12 calls among 4 times 10 to the power 4 possible ones. Adding a memo as for Fibonacci (an Integer[][] array, null when not computed yet) already gives the fast algorithm. We write the bottom-up version.}
+#+END_EXPORT
+
+** The knapsack as a table
+Sacks A (10 kg, 60), B (20 kg, 100), C (30 kg, 120), a bag of 50 kg. Greedy: 160.
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- $K[i][c]$: the best value with the *first $i$ sacks* and a capacity of $c$ kg.
+- Sack $i$ (weight $w$, value $v$) is skipped, or taken if it fits:
+  \[ K[i][c] = \max\big(K[i-1][c],\ \ v + K[i-1][c - w]\big) \]
+- Base case: with no sack, $K[0][c] = 0$. Order: row by row. Answer: $K[n][50]$.
+
+#+BEGIN_EXPORT latex
+\note{The table is the recursion, turned upside down: K[i][c] is best(i, c). The recursion only depends on two numbers, the number of sacks considered and the capacity left, so the table has two dimensions. Row i only uses row i - 1: filling row by row is a valid order.}
+#+END_EXPORT
+
+** Filling the table
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[x=0.75cm, y=0.45cm]
+  \fill[gray!8] (0,-3) rectangle (6,1);
+  \foreach \c in {0,...,5} {\pgfmathtruncatemacro{\kg}{10*\c}\node[font=\tiny, gray] at (\c+0.5,1.5) {\kg};}
+  \node[font=\tiny, gray, anchor=east] at (-0.1,1.5) {$c$ (kg)};
+  \foreach \i/\lab in {0/{$\emptyset$}, 1/{+A}, 2/{+B}, 3/{+C}} {\node[font=\tiny, anchor=east] at (-0.1,-\i+0.5) {\lab};}
+  \begin{scope}[visible on=<2->] \nrow{0}{0/0, 1/0, 2/0, 3/0, 4/0, 5/0} \end{scope}
+  \begin{scope}[visible on=<3->] \nrow{1}{0/0, 1/60, 2/60, 3/60, 4/60, 5/60} \end{scope}
+  \begin{scope}[visible on=<4->] \nrow{2}{0/0, 1/60, 2/100, 3/160, 4/160, 5/160} \end{scope}
+  \begin{scope}[visible on=<5->] \nrow{3}{0/0, 1/60, 2/100, 3/160, 4/180} \nrow[orange!45]{3}{5/220} \end{scope}
+  \draw[gray!70, line width=0.4pt] (0,-3) grid[step=1] (6,1);
+  \begin{scope}[visible on=<5>]
+    \draw[->, orange!80!black, thick] (5.5,-1.5) -- (5.5,-2.3);
+    \draw[->, orange!80!black, thick] (2.5,-1.5) -- (5.3,-2.4);
+  \end{scope}
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <5->
+- $K[3][50] = \max(K[2][50],\ 120 + K[2][20]) = \max(160, 220) = 220$: take B and C.
+
+#+BEGIN_EXPORT latex
+\note{The capacities go by steps of 10 kg, because all the weights are multiples of 10. Row A: from 10 kg on, A fits: 60. Row B: with 20 kg, B alone (100) is better than A (60); with 30 kg, both: 160. Row C (the arrows): with 50 kg, skip C and keep 160, or take C (120) and use the 20 kg left in the best way with A and B, that is 100. To find the sacks, walk back: K[3][50] differs from K[2][50], so C is taken; then K[2][20] = 100 differs from K[1][20] = 60, so B is taken; then K[1][0] = 0, nothing more.}
+#+END_EXPORT
+
+* Back to the delivery tour
+
+** The tour as a table
+#+ATTR_LATEX: :align c|ccc
+|   | A | B | C  |
+|---+---+---+----|
+| W | 3 | 4 | 10 |
+| A |   | 7 | 8  |
+| B |   |   | 10 |
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- $T(S, j)$: the shortest path that leaves W, visits *exactly the clients of $S$*, and ends at $j \in S$.
+- The client $i$ visited just before $j$:
+  \[ T(S, j) = \min_{i \,\in\, S,\ i \neq j} \big( T(S \setminus \{j\}, i) + d(i, j) \big), \qquad T(\{j\}, j) = d(W, j) \]
+- Order: by size of $S$. Answer: $\min_j \big( T(\text{all}, j) + d(j, W) \big)$.
+
+#+BEGIN_EXPORT latex
+\note{The key observation: once we know the set of clients already visited and where we are, the order in which they were visited no longer matters for the rest of the tour. So we do not need to remember the whole order, only the set and the last client. This is the Held and Karp algorithm (1962). The table has one row per subset of clients, and one column per last client.}
+#+END_EXPORT
+
+** Filling the table
+*** The table
+    :PROPERTIES:
+    :BEAMER_col: 0.4
+    :END:
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[x=0.7cm, y=0.42cm]
+  \fill[gray!8] (0,-6) rectangle (3,1);
+  \foreach \lab [count=\j from 0] in {A, B, C} {\node[font=\tiny, gray] at (\j+0.5,1.5) {\lab};}
+  \node[font=\tiny, gray, anchor=east] at (-0.1,1.5) {$S$ \textbackslash{} $j$};
+  \foreach \lab [count=\i from 0] in {A, B, C, {A, B}, {A, C}, {B, C}, {A, B, C}} {\node[font=\tiny, anchor=east] at (-0.1,-\i+0.5) {\{\lab\}};}
+  \foreach \r/\c in {0/1, 0/2, 1/0, 1/2, 2/0, 2/1, 3/2, 4/1, 5/0} {\fill[gray!35] (\c,-\r) rectangle ++(1,1);}
+  \begin{scope}[visible on=<2->] \nrow{0}{0/3} \nrow{1}{1/4} \nrow{2}{2/10} \end{scope}
+  \begin{scope}[visible on=<3->] \nrow{3}{0/11, 1/10} \nrow{4}{0/18, 2/11} \nrow{5}{1/20, 2/14} \end{scope}
+  \begin{scope}[visible on=<4->] \nrow{6}{0/22, 1/21, 2/19} \end{scope}
+  \draw[gray!70, line width=0.4pt] (0,-6) grid[step=1] (3,1);
+  \begin{scope}[visible on=<4>]
+    \draw[->, orange!80!black, thick] (1.5,-4.5) -- (0.65,-5.35);
+    \draw[->, orange!80!black, thick] (2.5,-4.5) -- (0.8,-5.4);
+  \end{scope}
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+*** The answer
+    :PROPERTIES:
+    :BEAMER_col: 0.58
+    :END:
+#+ATTR_BEAMER: :overlay <4->
+- $T(\{A,B,C\}, A) = \min(20 + 7,\ 14 + 8) = 22$.
+- Back to W: $\min(22 + 3,\ 21 + 4,\ 19 + 10) = 25$ km.
+- Same tour as around the circle, in one direction or the other.
+- Cells: $2^n \times n$, each in $O(n)$: $O(2^n n^2)$.
+- $n = 20$: $4 \cdot 10^8$ operations, instead of $20! \approx 2.4 \cdot 10^{18}$ tours.
+
+#+BEGIN_EXPORT latex
+\note{Size 1: from W directly to the client. Size 2: for example T({A, B}, A): visit B first (4), then go to A (7): 11. Size 3 (the arrows): to end at A after B and C, arrive from B (T({B, C}, B) + d(B, A) = 20 + 7) or from C (14 + 8): 22. The answer 25 is reached twice (22 + 3 and 21 + 4): the two directions of the same tour. Still exponential: the TSP is NP-hard, and nobody knows a polynomial algorithm. But 2 to the power n is far smaller than n factorial: brute force stops around 12 clients, this table goes up to about 25. The next course (branch and bound) goes further in practice.}
+#+END_EXPORT
+
+** Exercise: the cheapest path
+Go from the top left to the bottom right of a grid, moving *right* or *down*. Find the smallest sum of the cells on the path.
+
+#+BEGIN_EXPORT latex
+\begin{center}
+{\footnotesize\begin{tabular}{|c|c|c|} \hline 1 & 3 & 1 \\ \hline 1 & 5 & 1 \\ \hline 4 & 2 & 1 \\ \hline \end{tabular}}
+\end{center}
+#+END_EXPORT
+
+1. Greedy: always move to the smaller neighbour. Which sum do you get?
+2. Brute force: how many paths are there in a $3 \times 3$ grid? In an $n \times n$ grid?
+3. Dynamic programming: subproblem, recurrence, base cases, order and answer.
+4. Write the code. What is its cost?
+
+#+BEGIN_EXPORT latex
+\note{Give students 10 to 15 minutes; the solution is at the end of the course. 1. From the corner, down (1) is smaller than right (3); then down (4) is smaller than right (5); then 2 and 1: 1 + 1 + 4 + 2 + 1 = 9. 2. A path makes n - 1 moves right and n - 1 moves down, in any order: C(2n - 2, n - 1) paths, 6 for a 3 by 3 grid. 3 and 4: see the solution.}
+#+END_EXPORT
+
+* Solution: the cheapest path
+
+** The cheapest path: the method
+#+ATTR_BEAMER: :overlay <+(1)->
+- *Subproblem*: $P[i][j]$, the smallest sum of a path from the top left to the cell $(i, j)$.
+- *Recurrence*: we arrive from above or from the left:
+  \[ P[i][j] = g[i][j] + \min\big(P[i-1][j],\ P[i][j-1]\big) \]
+- *Base cases*: $P[0][0] = g[0][0]$; on the first row and the first column, only one choice.
+- *Order*: row by row, from left to right. *Answer*: $P[n-1][m-1]$.
+
+#+BEGIN_EXPORT latex
+\note{Optimal substructure: the best path to (i, j) ends with a best path to the cell above or to the cell on the left. Overlapping subproblems: many paths go through the same cell. On the first row, we can only arrive from the left: P[0][j] = g[0][j] + P[0][j - 1]; on the first column, only from above.}
+#+END_EXPORT
+
+** The cheapest path: the table
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[x=0.8cm, y=0.6cm]
+  \node[font=\scriptsize] at (1.5,1.5) {$g$};
+  \nrow[gray!8]{0}{0/1, 1/3, 2/1} \nrow[gray!8]{1}{0/1, 1/5, 2/1} \nrow[gray!8]{2}{0/4, 1/2, 2/1}
+  \draw[gray!70, line width=0.4pt] (0,-2) grid[step=1] (3,1);
+  \begin{scope}[xshift=3.2cm]
+    \node[font=\scriptsize] at (1.5,1.5) {$P$};
+    \fill[gray!8] (0,-2) rectangle (3,1);
+    \begin{scope}[visible on=<2->] \nrow{0}{0/1, 1/4, 2/5} \end{scope}
+    \begin{scope}[visible on=<3->] \nrow{1}{0/2, 1/7, 2/6} \end{scope}
+    \begin{scope}[visible on=<4->] \nrow{2}{0/6, 1/8, 2/7} \end{scope}
+    \begin{scope}[visible on=<5->] \nrow[orange!45]{0}{0/1, 1/4, 2/5} \nrow[orange!45]{1}{2/6} \nrow[orange!45]{2}{2/7} \end{scope}
+    \draw[gray!70, line width=0.4pt] (0,-2) grid[step=1] (3,1);
+  \end{scope}
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <5->
+- Answer: 7, by $1 + 3 + 1 + 1 + 1$. Greedy gave 9.
+- Walking back: from each cell, go to the smaller of the cell above and the cell on the left.
+
+#+BEGIN_EXPORT latex
+\note{Row 0: only from the left, 1, 4, 5. Row 1: P[1][0] = 1 + 1 = 2; P[1][1] = 5 + min(4, 2) = 7; P[1][2] = 1 + min(5, 7) = 6. Row 2: P[2][0] = 4 + 2 = 6; P[2][1] = 2 + min(7, 6) = 8; P[2][2] = 1 + min(6, 8) = 7. Walking back from 7: above is 6, left is 8, go up; from 6, above is 5: up; then left along the first row. As for the coins and the knapsack, we follow the choices back.}
+#+END_EXPORT
+
+** The cheapest path: the code
+#+begin_src java
+// p[i][j]: the smallest sum of a path from (0, 0) to (i, j)
+int cheapestPath(int[][] g) {
+    int n = g.length, m = g[0].length;
+    int[][] p = new int[n][m];
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < m; j++) {
+            if (i == 0 && j == 0) p[i][j] = g[0][0];
+            else if (i == 0) p[i][j] = g[i][j] + p[i][j - 1];      // from the left
+            else if (j == 0) p[i][j] = g[i][j] + p[i - 1][j];      // from above
+            else p[i][j] = g[i][j] + Math.min(p[i - 1][j], p[i][j - 1]);
+        }
+    return p[n - 1][m - 1];
+}
+#+end_src
+
+\pause
+- $O(n \times m)$ time, instead of $\binom{n + m - 2}{n - 1}$ paths: $20 \times 20$, 400 cells instead of $3.5 \cdot 10^{10}$ paths.
+
+#+BEGIN_EXPORT latex
+\note{Each cell is computed once, in constant time. The cells used (above and on the left) are already filled in the row by row order. As for Fibonacci, each row only uses the previous one: one row is enough for the value alone. Variants: count the paths (P[i][j] = P[i - 1][j] + P[i][j - 1]), forbid some cells, allow diagonal moves.}
+#+END_EXPORT
+
+* Summary
+
+** Key takeaways
+- *Optimization problem*: the best candidate among many. Brute force is exponential.
+- *Greedy*: one choice per step, never revised. Fast, but optimal only with a proof.
+- *Dynamic programming*: try every choice, but solve each subproblem once, in a table. Top-down (memo) or bottom-up (loops).
+- The method: subproblem, recurrence, base cases, order, answer. The hard part: the sentence that defines a cell.
+
+#+BEGIN_EXPORT latex
+\note{Ask students to list the problems of the course and, for each one, the sentence that defines a cell: fib(i); the fewest coins to pay a; the best value with the first i sacks and a capacity c; the shortest path from W through the clients of S ending at j; the cheapest path to the cell (i, j). Most of the work of dynamic programming is finding this sentence.}
+#+END_EXPORT
+
+** Three problems, three approaches
+#+ATTR_LATEX: :align llll :font \footnotesize
+|             | Brute force          | Greedy                        | Dynamic programming     |
+|-------------+----------------------+-------------------------------+-------------------------|
+| Knapsack    | $O(2^n)$             | $O(n \log n)$, not optimal    | $O(n \times \text{capacity})$ |
+| Tour        | $O(n!)$              | $O(n^2)$, not optimal         | $O(2^n n^2)$            |
+| Coin change | exponential in $a$   | $O(k + \text{coins})$, canonical coins | $O(a \times k)$ |
+
+\pause
+- Greedy: fast, approximate. Dynamic programming: exact, slower, but far faster than brute force.
+
+#+BEGIN_EXPORT latex
+\note{Read the table by columns. Brute force is always exact and always too slow. Greedy is always fast, and exact only in special cases. Dynamic programming is always exact; it is polynomial in the capacity or the amount for the knapsack and the coins, and still exponential for the tour, but 2 to the power n instead of n factorial. The three problems remain NP-hard: dynamic programming does not change that, it pushes the limit further.}
+#+END_EXPORT
+
+** Three paradigms
+#+ATTR_LATEX: :align llll :font \footnotesize
+|               | Divide and conquer   | Greedy                  | Dynamic programming        |
+|---------------+----------------------+-------------------------+----------------------------|
+| Subproblems   | independent          | one, after the choice   | overlapping                |
+| Choices       | none                 | one: the best now       | all, keep the best         |
+| Correctness   | by the recursion     | needs a proof           | by the recurrence          |
+| Examples      | merge sort           | change (DA coins)       | coins, 0/1 knapsack, tour |
+
+#+BEGIN_EXPORT latex
+\note{The three paradigms split a problem into smaller ones; they differ in how many choices they explore. Divide and conquer has no choice to make: the halves are fixed. Greedy makes one choice and commits to it. Dynamic programming tries every choice, but each subproblem is solved once. When greedy works, it is faster than dynamic programming (DA coins: a few operations instead of a times k); when it fails, dynamic programming is the safe solution, if the number of different subproblems is small.}
+#+END_EXPORT
+
+** An open question: eight queens
+*** The board
+    :PROPERTIES:
+    :BEAMER_col: 0.35
+    :END:
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[scale=0.32]
+  \foreach \r in {0,...,7} \foreach \cc in {0,...,7} {
+    \pgfmathtruncatemacro{\odd}{mod(\r+\cc,2)}
+    \ifnum\odd=1 \fill[gray!35] (\cc,-\r) rectangle ++(1,1); \fi}
+  \draw (0,-7) rectangle (8,1);
+  \foreach \r/\cc in {0/0, 1/4, 2/7, 3/5, 4/2, 5/6, 6/1, 7/3} {\node[circle, fill=structure, inner sep=1.6pt] at (\cc+0.5,-\r+0.5) {};}
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+*** The question
+    :PROPERTIES:
+    :BEAMER_col: 0.63
+    :END:
+Place 8 queens on a chessboard, no two on the same row, column or diagonal.
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- Brute force: $\binom{64}{8} \approx 4.4 \cdot 10^9$ placements; one queen per row: $8^8 \approx 1.7 \cdot 10^7$.
+- No good greedy choice, no small table of subproblems.
+- But after 2 queens on the same diagonal, why place the 6 others? (next course)
+
+#+BEGIN_EXPORT latex
+\note{There are 92 solutions; the picture shows one. Ask students how they would avoid testing the 16 million placements. The idea: place the queens row by row, and go back as soon as a queen is attacked, without completing the placement. This is backtracking, the subject of the next course, together with branch and bound, which finds the shortest delivery tour for more clients than the table of today.}
+#+END_EXPORT

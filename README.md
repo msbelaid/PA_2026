@@ -33,6 +33,10 @@ complexity analysis.
 | 01 | Hash Tables: search in constant time      | 14/10/2026 | [View](courses/01-HashTables.pdf) · [Download](https://github.com/msbelaid/PA_2026/raw/main/courses/01-HashTables.pdf) | [Org](courses/01-HashTables.org)           |
 | 02 | Dynamic Arrays: growing in amortized O(1) | 21/10/2026 | [View](courses/02-DynamicArrays.pdf) · [Download](https://github.com/msbelaid/PA_2026/raw/main/courses/02-DynamicArrays.pdf) | [Org](courses/02-DynamicArrays.org)        |
 | 03 | Tries and Bloom filters: prefixes and probabilistic sets | 28/10/2026 | [View](courses/03-TriesBloomFilters.pdf) · [Download](https://github.com/msbelaid/PA_2026/raw/main/courses/03-TriesBloomFilters.pdf) | [Org](courses/03-TriesBloomFilters.org) |
+| 04 | Recursion, brute force and divide and conquer | 04/11/2026 | [View](courses/04-RecursionDivideConquer.pdf) · [Download](https://github.com/msbelaid/PA_2026/raw/main/courses/04-RecursionDivideConquer.pdf) | [Org](courses/04-RecursionDivideConquer.org) |
+| 05 | Greedy algorithms and dynamic programming | 11/11/2026 | [View](courses/05-GreedyDynamicProgramming.pdf) · [Download](https://github.com/msbelaid/PA_2026/raw/main/courses/05-GreedyDynamicProgramming.pdf) | [Org](courses/05-GreedyDynamicProgramming.org) |
+| 06 | Backtracking and branch and bound         | 18/11/2026 | [View](courses/06-BacktrackingBranchBound.pdf) · [Download](https://github.com/msbelaid/PA_2026/raw/main/courses/06-BacktrackingBranchBound.pdf) | [Org](courses/06-BacktrackingBranchBound.org) |
+| 07 | Randomized algorithms and metaheuristics  | 25/11/2026 | [View](courses/07-RandomizedAlgorithms.pdf) · [Download](https://github.com/msbelaid/PA_2026/raw/main/courses/07-RandomizedAlgorithms.pdf) | [Org](courses/07-RandomizedAlgorithms.org) |
 
 ## Labs (TP)
 

@@ -1,0 +1,901 @@
+#+TITLE: Recursion, brute force and divide and conquer
+#+AUTHOR: Mohammed Said BELAID @@latex:\\@@ said.belaid@univ-usto.dz @@latex:\\ \href{https://github.com/msbelaid}{github.com/msbelaid}@@
+#+SUBTITLE: Trying everything, then splitting the problem
+#+DATE: 04/11/2026
+#+EMAIL: said.belaid@univ-usto.dz
+#+OPTIONS: H:2
+#+startup: beamer
+#+latex_header: \mode<beamer>{\usetheme{Antibes}}
+#+OPTIONS: listings:t
+#+LaTeX_CLASS: beamer
+#+LATEX_CLASS_OPTIONS: [aspectratio=169]
+#+LATEX_HEADER: \usepackage{listings}
+#+LATEX_HEADER: \usepackage{tikz}
+#+LATEX_HEADER: \usetikzlibrary{positioning, decorations.pathreplacing}
+#+LATEX_HEADER: \tikzset{onslide/.code args={<#1>#2}{\only<#1>{\pgfkeysalso{#2}}}}
+#+LATEX_HEADER: \tikzset{alt/.code args={<#1>#2#3}{\alt<#1>{\pgfkeysalso{#2}}{\pgfkeysalso{#3}}}}
+#+LATEX_HEADER: \tikzset{invisible/.style={opacity=0}, visible on/.style={alt={#1{}{invisible}}}}
+#+LATEX_HEADER: % \cells{cell width}{y}{last index}: empty cells, with their index below
+#+LATEX_HEADER: \newcommand{\cells}[3]{\foreach \i in {0,...,#3} {\draw[fill=gray!8] (\i*#1,#2) rectangle ++(#1,0.6); \node[font=\tiny, gray] at (\i*#1+#1/2,#2-0.15) {\i};}}
+#+LATEX_HEADER: % \vals[fill]{cell width}{y}{index/value list}: filled cells
+#+LATEX_HEADER: \newcommand{\vals}[4][structure!15]{\foreach \i/\v in {#4} {\draw[fill=#1] (\i*#2,#3) rectangle ++(#2,0.6); \node[font=\scriptsize] at (\i*#2+#2/2,#3+0.3) {\v};}}
+#+LATEX_HEADER: % \gains: the daily gains of the running example, cells of width 0.9
+#+LATEX_HEADER: \newcommand{\gains}{\cells{0.9}{0}{8} \vals{0.9}{0}{0/$-2$, 1/$1$, 2/$-3$, 3/$4$, 4/$-1$, 5/$2$, 6/$1$, 7/$-5$, 8/$4$}}
+#+LATEX_HEADER: % Nodes of recursion trees
+#+LATEX_HEADER: \tikzset{rnode/.style={draw, rounded corners=2pt, fill=gray!8, font=\tiny, inner sep=2pt, minimum height=0.4cm}}
+
+#+LATEX_HEADER: \lstset{
+#+LATEX_HEADER:   basicstyle=\ttfamily\fontsize{7.5}{9}\selectfont,
+#+LATEX_HEADER:   keywordstyle=\color{blue!70!black}\bfseries,
+#+LATEX_HEADER:   commentstyle=\color{green!45!black}\itshape,
+#+LATEX_HEADER:   stringstyle=\color{red!65!black},
+#+LATEX_HEADER:   backgroundcolor=\color{gray!8},
+#+LATEX_HEADER:   frame=single,
+#+LATEX_HEADER:   rulecolor=\color{gray!50},
+#+LATEX_HEADER:   breaklines=true,
+#+LATEX_HEADER:   showstringspaces=false
+#+LATEX_HEADER: }
+#+LaTeX_HEADER: \logo{\includegraphics[height=1cm]{../images/usto.png}}
+#+LATEX_HEADER: \usepackage{xcolor}
+#+LATEX_HEADER: \AtBeginSection[]{\begin{frame}<beamer>{Outline}\tableofcontents[currentsection]\end{frame}}
+
+
+* The problem: the best period
+
+** Algorithmic paradigms
+#+BEGIN_EXPORT latex
+\begin{block}{Algorithmic paradigm}
+A general method to design algorithms, that applies to many different problems.
+\end{block}
+#+END_EXPORT
+
+\pause
+#+ATTR_LATEX: :align ll
+| Paradigm              | The idea                                         |
+|-----------------------+--------------------------------------------------|
+| Brute force           | try every candidate                              |
+| Divide and conquer    | split the problem, solve the parts, combine      |
+| Greedy                | make the best local choice at each step          |
+| Dynamic programming   | solve each subproblem once, and reuse it         |
+| Backtracking, B&B     | explore the candidates, cut the useless branches |
+| Stochastic algorithms | search randomly for a good solution              |
+
+#+BEGIN_EXPORT latex
+\note{A paradigm is not an algorithm: it is a way of thinking that produces algorithms. The same problem can often be solved with several paradigms, at very different costs; this is what we will see on a few running examples. Recursion is not in the table: it is the tool that most of these paradigms use, so we study it first.}
+#+END_EXPORT
+
+** The maximum subarray problem
+The daily gains of a stock, in DA:
+
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}
+  \gains
+  \begin{scope}[visible on=<3->]
+    \vals[orange!45]{0.9}{0}{3/$4$, 4/$-1$, 5/$2$, 6/$1$}
+    \draw[decorate, decoration={brace, amplitude=5pt}, thick] (2.7,0.7) -- (6.3,0.7) node[midway, above=5pt, font=\scriptsize] {$4 - 1 + 2 + 1 = 6$};
+  \end{scope}
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <2->
+- Find the period (consecutive days) with the *largest total gain*.
+- Answer: days 3 to 6, gain 6.
+- Same problem: the most active period of a sensor, the best segment of a signal, ...
+
+#+BEGIN_EXPORT latex
+\note{A subarray is a block of consecutive cells, not any subset. Let students search for the answer by hand for one minute. Many will start from the largest value (4) and extend it. Ask: how would you be sure that no other period is better? The only obvious answer: try them all. If all values are positive, the answer is the whole array; the problem is interesting only because of the negative values.}
+#+END_EXPORT
+
+** A first solution: try every period
+#+begin_src java
+int maxSubarray(int[] a) {
+    int best = a[0];
+    for (int i = 0; i < a.length; i++)          // first day
+        for (int j = i; j < a.length; j++) {    // last day
+            int sum = 0;
+            for (int k = i; k <= j; k++)        // total of a[i..j]
+                sum += a[k];
+            best = Math.max(best, sum);
+        }
+    return best;
+}
+#+end_src
+
+\pause
+- $\frac{n(n+1)}{2}$ periods, up to $n$ additions each: $O(n^3)$.
+
+#+BEGIN_EXPORT latex
+\note{best starts at a[0] and not at 0: if every day is a loss, the answer is the least bad day, not an empty period. For n = 1000 days, this is already about 170 million additions.}
+#+END_EXPORT
+
+** Removing a loop
+The total of =a[i..j]= is the total of =a[i..j-1]=, plus =a[j]=.
+
+#+begin_src java
+int maxSubarray(int[] a) {
+    int best = a[0];
+    for (int i = 0; i < a.length; i++) {
+        int sum = 0;
+        for (int j = i; j < a.length; j++) {
+            sum += a[j];                  // total of a[i..j]
+            best = Math.max(best, sum);
+        }
+    }
+    return best;
+}
+#+end_src
+
+\pause
+- $O(n^2)$: better, but we still try *every* period.
+- Can we avoid trying them all? (end of this course)
+
+#+BEGIN_EXPORT latex
+\note{This is still brute force: every candidate is tested, we only test each one faster by reusing the previous sum. To go below O(n^2), we must avoid looking at every period; this needs a new idea, divide and conquer, at the end of the course.}
+#+END_EXPORT
+
+* Brute force
+
+** What is brute force?
+#+BEGIN_EXPORT latex
+\begin{block}{Brute force (exhaustive search)}
+Enumerate every candidate solution, test each one, and keep the valid one (or the best one).
+\end{block}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- Two parts: *generate* the candidates, *test* each one.
+- Always correct, if no candidate is forgotten.
+- Its cost: the number of candidates $\times$ the cost of one test.
+
+#+BEGIN_EXPORT latex
+\note{Linear search is the simplest brute force: the candidates are the cells of the array. For the maximum subarray, the candidates are the n(n+1)/2 periods. The question is always: how many candidates are there? It decides whether brute force is usable.}
+#+END_EXPORT
+
+** Subset sum
+Given a set of numbers, is there a subset whose sum is exactly the target?
+
+#+BEGIN_EXPORT latex
+\begin{center}
+\Large $\{3, 34, 4, 12, 5, 2\}$, \quad target $= 9$
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- Yes: $4 + 5 = 9$, or $3 + 4 + 2 = 9$.
+- Candidates: all the subsets. Each element is *in* or *out*: $2^n$ subsets.
+- $n = 6$: 64 subsets. $n = 40$: about $10^{12}$ subsets.
+
+#+BEGIN_EXPORT latex
+\note{Subset sum appears in many forms: can a set of invoices pay exactly an amount, can tasks fill exactly a time slot, ... No algorithm is known that solves it fast in every case: it is NP-complete. Ask: how would you write the loops that generate all the subsets? With 6 elements, 6 nested loops; but the number of elements is not known in advance. We need recursion.}
+#+END_EXPORT
+
+** How fast does it grow?
+At $10^9$ operations per second:
+
+| $n$ | $n^2$        | $2^n$        | $n!$                    |
+|-----+--------------+--------------+-------------------------|
+|  10 | 0.1 \(\mu\)s | 1 \(\mu\)s     | 3.6 ms                  |
+|  20 | 0.4 \(\mu\)s | 1 ms         | 77 years                |
+|  30 | 0.9 \(\mu\)s | 1 s          | $8 \cdot 10^{15}$ years |
+|  50 | 2.5 \(\mu\)s | 13 days      | $10^{48}$ years         |
+
+\pause
+- $2^n$: subsets. $n!$: orderings (permutations).
+- A faster computer does not help: 1000 times faster adds only 10 to $n$ for $2^n$.
+
+#+BEGIN_EXPORT latex
+\note{The age of the universe is about 1.4 times 10 to the power 10 years. n! counts the orderings of n elements: the possible tours of a delivery driver through n cities, for example (we come back to this problem in course 06). Last point: 2 to the power 10 is about 1000, so a computer 1000 times faster solves in the same time a problem with only 10 more elements.}
+#+END_EXPORT
+
+** When is brute force good enough?
+#+ATTR_BEAMER: :overlay <+->
+- When $n$ is *small*: 20 elements, $2^{20} \approx 10^6$ subsets, instant.
+- As a *reference solution*: simple, so probably correct; compare a fast algorithm against it on small inputs.
+- As a *first step*: write it, understand the problem, then look for a better idea.
+- When nothing better is known (many problems on subsets and orderings).
+
+#+BEGIN_EXPORT latex
+\note{The second point is very useful in practice, and in programming contests: generate thousands of small random inputs, run the brute force and the fast algorithm, and compare the answers. The first difference shows a bug in the fast algorithm. The other paradigms of this part can all be seen as ways of not trying every candidate.}
+#+END_EXPORT
+
+* Recursion
+
+** A function that calls itself
+#+BEGIN_EXPORT latex
+\begin{block}{Recursion}
+A recursive function solves a problem by calling itself on a \emph{smaller} instance of the same problem.
+\end{block}
+#+END_EXPORT
+
+$n! = n \times (n-1)!$, and $0! = 1$:
+
+#+begin_src java
+long factorial(int n) {
+    if (n == 0) return 1;           // base case
+    return n * factorial(n - 1);    // recursive case
+}
+#+end_src
+
+\pause
+- *Base case*: solved directly, without a recursive call.
+- *Recursive case*: a call on a smaller problem, closer to the base case.
+
+#+BEGIN_EXPORT latex
+\note{The recursive code is a direct translation of the mathematical definition. Insist on the two conditions: there is a base case, and each call gets closer to it. Then the recursion always stops. Ask: what does factorial(-1) do? It never reaches 0: the calls continue until the program crashes (next slides).}
+#+END_EXPORT
+
+** The call stack
+#+BEGIN_EXPORT latex
+\begin{columns}[c]
+\begin{column}{0.48\textwidth}
+\begin{center}
+\begin{tikzpicture}[fr/.style={draw, minimum width=4.6cm, minimum height=0.55cm, font=\scriptsize\ttfamily, anchor=south}]
+  \node[fr, fill=gray!8] at (0,0) {main: \alt<9>{result = 6}{factorial(3)}};
+  \node[fr, fill=structure!15, visible on=<2-8>] at (0,0.6) {\alt<8>{n=3: return 3 * 2 = 6}{n=3: 3 * factorial(2)}};
+  \node[fr, fill=structure!15, visible on=<3-7>] at (0,1.2) {\alt<7>{n=2: return 2 * 1 = 2}{n=2: 2 * factorial(1)}};
+  \node[fr, fill=structure!15, visible on=<4-6>] at (0,1.8) {\alt<6>{n=1: return 1 * 1 = 1}{n=1: 1 * factorial(0)}};
+  \node[fr, fill=orange!45, visible on=<5>] at (0,2.4) {n=0: return 1};
+\end{tikzpicture}
+\end{center}
+\end{column}
+\begin{column}{0.5\textwidth}
+\uncover<2->{\alert<2-4>{Each call pushes a \emph{frame} on the stack: its parameters, its local variables, where to come back.}}
+
+\medskip
+\uncover<5->{\alert<5>{Base case: no new call.}}
+
+\medskip
+\uncover<6->{\alert<6-8>{The frames are popped one by one, each one finishes its multiplication.}}
+
+\medskip
+\uncover<9->{\alert<9>{At the deepest point: $n + 1$ frames. Memory $O(n)$.}}
+\end{column}
+\end{columns}
+\note{Each frame has its own n: the four variables n are different. The multiplication of a frame waits until the call above it returns. Recursion is not free: each call costs time (push and pop a frame) and memory, even if the code does not allocate anything.}
+#+END_EXPORT
+
+** When recursion goes wrong
+#+begin_src java
+long factorial(int n) {
+    return n * factorial(n - 1);    // no base case
+}
+#+end_src
+
+#+ATTR_BEAMER: :overlay <+->
+- No base case, or a call that does not get closer to it: the calls never stop.
+- The stack is limited: Java throws a =StackOverflowError=, Python a =RecursionError= (after 1000 calls by default).
+- Even a correct recursion fails if it is too deep: =factorial(100000)= overflows the stack.
+
+#+BEGIN_EXPORT latex
+\note{The Java stack is a fixed memory zone, typically 512 KB to 1 MB per thread: a simple recursive function overflows after some thousands to some tens of thousands of calls. Python sets an explicit limit, sys.getrecursionlimit() returns 1000. So a recursion of depth n is a bad idea when n can reach a million. In the last example, the result would not fit in a long anyway (21! is already too large, and Java does not warn: the value silently wraps around). But no multiplication is done before the deepest call, so the stack overflows first.}
+#+END_EXPORT
+
+** Recursion vs. iteration
+*** Recursive
+    :PROPERTIES:
+    :BEAMER_col: 0.48
+    :BEAMER_env: block
+    :END:
+#+begin_src java
+long factorial(int n) {
+    if (n == 0) return 1;
+    return n * factorial(n - 1);
+}
+#+end_src
+Memory: $O(n)$, the stack.
+
+*** Iterative
+    :PROPERTIES:
+    :BEAMER_col: 0.48
+    :BEAMER_env: block
+    :END:
+#+begin_src java
+long factorial(int n) {
+    long result = 1;
+    for (int i = 2; i <= n; i++)
+        result *= i;
+    return result;
+}
+#+end_src
+Memory: $O(1)$.
+
+*** After the columns
+    :PROPERTIES:
+    :BEAMER_env: ignoreheading
+    :END:
+\pause
+- Any recursion can be written with loops (and an explicit stack if needed).
+- Recursion is the natural choice when the problem *is* recursive: trees, subsets, splitting in halves.
+
+#+BEGIN_EXPORT latex
+\note{For factorial, the loop is simpler and better. Recursion shines when a function must call itself several times: visiting a tree (the autocomplete of the Tries course was a recursive traversal), generating subsets, sorting by halves. Some languages turn a call in last position (tail recursion) into a loop; Java and Python do not.}
+#+END_EXPORT
+
+** Thinking recursively: trust the call
+#+begin_src java
+String reverse(String s) {
+    if (s.isEmpty()) return s;                       // base case
+    return reverse(s.substring(1)) + s.charAt(0);    // smaller problem
+}
+#+end_src
+
+Do not follow every call. Check only two things:
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- The *base case* is correct: the empty string is its own reverse.
+- *If* the call on the smaller problem is correct, the result is correct: \newline
+  =reverse("bcd")= gives ="dcb"=, then add ='a'=: ="dcba"=.
+- This is a proof by *induction* on the length of the string.
+
+#+BEGIN_EXPORT latex
+\note{Students often try to trace every call in their head: this works for factorial(3), not for a tree of 2 to the power n calls. Write the base case, then assume the recursive call already works (the "recursive leap of faith") and only check that one step builds the right answer from it. Induction guarantees the rest. Remark: substring and + copy the string at each call, so this version costs O(n squared); it is chosen for clarity, not speed.}
+#+END_EXPORT
+
+** Exercise: write recursive functions
+For each function: what is the base case? How deep is the stack?
+
+1. =sum(a, n)=: the sum of the first =n= elements of the array =a=.
+2. =power(x, n)=: $x^n$, for $n \geq 0$, using $x^n = x \times x^{n-1}$.
+3. =isPalindrome(s, i, j)=: is =s[i..j]= a palindrome? (="radar"=, ="level"=)
+
+#+BEGIN_EXPORT latex
+\note{Answers. 1. if n == 0 return 0; return sum(a, n - 1) + a[n - 1]. Depth n + 1. 2. if n == 0 return 1; return x * power(x, n - 1). Depth n + 1; we will do much better with divide and conquer. 3. if i >= j return true; if s.charAt(i) != s.charAt(j) return false; return isPalindrome(s, i + 1, j - 1). Depth about n / 2. The first call is isPalindrome(s, 0, s.length() - 1).}
+#+END_EXPORT
+
+* Exhaustive search by recursion
+
+** Generating all the subsets
+For each element, two choices: *take* it or *skip* it.
+
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[level distance=0.85cm,
+    level 1/.style={sibling distance=5.6cm}, level 2/.style={sibling distance=2.8cm},
+    level 3/.style={sibling distance=1.4cm},
+    edge from parent/.style={draw, gray}, every node/.style={rnode}]
+  \node {\{\}}
+    child {node {\{1\}}
+      child {node {\{1,2\}}
+        child {node[onslide=<2->{fill=orange!45}] {\{1,2,3\}}}
+        child {node[onslide=<2->{fill=orange!45}] {\{1,2\}}}}
+      child {node {\{1\}}
+        child {node[onslide=<2->{fill=orange!45}] {\{1,3\}}}
+        child {node[onslide=<2->{fill=orange!45}] {\{1\}}}}
+      edge from parent node[draw=none, fill=none, left=2pt] {take 1}}
+    child {node {\{\}}
+      child {node {\{2\}}
+        child {node[onslide=<2->{fill=orange!45}] {\{2,3\}}}
+        child {node[onslide=<2->{fill=orange!45}] {\{2\}}}}
+      child {node {\{\}}
+        child {node[onslide=<2->{fill=orange!45}] {\{3\}}}
+        child {node[onslide=<2->{fill=orange!45}] {\{\}}}}
+      edge from parent node[draw=none, fill=none, right=2pt] {skip 1}};
+  \node[draw=none, fill=none, font=\scriptsize, gray] at (-6.3,-0.85) {element 1?};
+  \node[draw=none, fill=none, font=\scriptsize, gray] at (-6.3,-1.7) {element 2?};
+  \node[draw=none, fill=none, font=\scriptsize, gray] at (-6.3,-2.55) {element 3?};
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <2->
+- The *recursion tree*: one node per call. Each leaf is a subset: $2^3 = 8$ leaves.
+
+#+BEGIN_EXPORT latex
+\note{Each level of the tree decides one element: left child, we take it; right child, we skip it. A path from the root to a leaf is a sequence of n decisions, so there are 2 to the power n leaves. The recursion tree is the picture of all the calls: the root is the first call, the children of a node are the calls it makes. With factorial, the tree is a single chain; here each call makes two calls.}
+#+END_EXPORT
+
+** Subsets: the code
+#+begin_src java
+// decides the elements a[i], a[i+1], ...; chosen holds the elements taken so far
+void subsets(int[] a, int i, List<Integer> chosen) {
+    if (i == a.length) {                 // all elements decided: a leaf
+        System.out.println(chosen);
+        return;
+    }
+    chosen.add(a[i]);                    // take a[i]
+    subsets(a, i + 1, chosen);
+    chosen.remove(chosen.size() - 1);    // undo
+    subsets(a, i + 1, chosen);           // skip a[i]
+}
+#+end_src
+
+First call: =subsets(a, 0, new ArrayList<>())=.
+
+\pause
+- Cost: $2^n$ leaves, each printed in $O(n)$: $O(n \cdot 2^n)$.
+- Stack depth: only $n + 1$.
+
+#+BEGIN_EXPORT latex
+\note{The "undo" line is essential: chosen is shared by all the calls, so before exploring the second branch we must give it back the state it had before the first branch. This pattern (choose, explore, undo) is the heart of backtracking, in course 06. The tree has 2 to the power n leaves, but the stack only holds one path at a time.}
+#+END_EXPORT
+
+** Subset sum by recursion
+#+begin_src java
+// is there a subset of a[i], a[i+1], ... whose sum is target?
+boolean subsetSum(int[] a, int i, int target) {
+    if (target == 0) return true;        // found
+    if (i == a.length) return false;     // no element left
+    return subsetSum(a, i + 1, target - a[i])   // take a[i]
+        || subsetSum(a, i + 1, target);         // skip a[i]
+}
+#+end_src
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- We do not build the subset: the target decreases when we take an element.
+- =||= stops as soon as one branch finds a subset.
+- Worst case (no solution): all the $2^n$ leaves, $O(2^n)$.
+
+#+BEGIN_EXPORT latex
+\note{The question "is there a subset of the remaining elements with sum target?" is the same problem on a smaller array: this is what makes the recursion work. The answer is true for the first call subsetSum(a, 0, 9) with the example set.}
+#+END_EXPORT
+
+** Generating all the permutations
+For the first position, choose any element; then permute the others.
+
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[level distance=0.75cm,
+    level 1/.style={sibling distance=4cm}, level 2/.style={sibling distance=2cm},
+    edge from parent/.style={draw, gray}, every node/.style={rnode}]
+  \node {start}
+    child {node {1} child {node {1 2} child {node[fill=orange!45] {1 2 3}}} child {node {1 3} child {node[fill=orange!45] {1 3 2}}}}
+    child {node {2} child {node {2 1} child {node[fill=orange!45] {2 1 3}}} child {node {2 3} child {node[fill=orange!45] {2 3 1}}}}
+    child {node {3} child {node {3 1} child {node[fill=orange!45] {3 1 2}}} child {node {3 2} child {node[fill=orange!45] {3 2 1}}}};
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+- $n$ choices, then $n - 1$, then $n - 2$, ...: $n!$ leaves.
+
+#+BEGIN_EXPORT latex
+\note{Here the number of children decreases with the depth: n children at the root, n - 1 at the next level, ... The orderings are produced in lexicographic order when the elements are sorted. Ask: how many leaves for 10 elements? 3,628,800.}
+#+END_EXPORT
+
+** Permutations: the code
+#+begin_src java
+void permutations(int[] a, boolean[] used, List<Integer> current) {
+    if (current.size() == a.length) {    // every position is filled
+        System.out.println(current);
+        return;
+    }
+    for (int i = 0; i < a.length; i++) {
+        if (used[i]) continue;           // already placed
+        used[i] = true;                  // place a[i]
+        current.add(a[i]);
+        permutations(a, used, current);
+        current.remove(current.size() - 1);   // undo
+        used[i] = false;
+    }
+}
+#+end_src
+
+\pause
+- Cost: $n!$ leaves: unusable beyond $n \approx 12$.
+
+#+BEGIN_EXPORT latex
+\note{Same pattern as the subsets: choose, explore, undo. The boolean array used marks the elements already placed. 12! is about 479 million: a few seconds. 15! is about 1.3 times 10 to the power 12: already too long. The loop with a recursive call inside is what makes the tree wider than 2.}
+#+END_EXPORT
+
+** Exercise: a recursion tree
+Run =subsetSum(a, 0, 7)= with =a = {3, 5, 2}=.
+
+1. Draw the recursion tree, as far as the calls actually go.
+2. How many calls are made? Which subset is found?
+3. Some calls continue with a negative target. Why are they useless?
+
+#+BEGIN_EXPORT latex
+\note{Answers. 1 and 2. 11 calls: (0,7), (1,4), (2,-1), (3,-3), (3,-1), (2,4), (3,2), (3,4), (1,7), (2,2), (3,0). The first branch (take 3) fails completely; the second one finds 5 + 2 = 7 and the operator || stops everything. 3. With positive numbers, the target can only decrease: once negative, it can never reach 0. Testing target < 0 would cut these branches. Cutting the useless branches is backtracking, in course 06.}
+#+END_EXPORT
+
+* Divide and conquer
+
+** The idea
+#+BEGIN_EXPORT latex
+\begin{block}{Divide and conquer}
+\begin{enumerate}
+\item \textbf{Divide} the problem into smaller subproblems of the same type.
+\item \textbf{Conquer}: solve each subproblem recursively (directly if it is small).
+\item \textbf{Combine} their solutions into a solution of the problem.
+\end{enumerate}
+\end{block}
+
+\begin{center}
+\begin{tikzpicture}[>=stealth, box/.style={draw, rounded corners, font=\scriptsize, minimum height=0.5cm, inner sep=3pt}]
+  \node[box, fill=gray!8] (p) at (0,0) {problem of size $n$};
+  \node[box, fill=structure!15, visible on=<2->] (p1) at (-2.2,-1) {size $n/2$};
+  \node[box, fill=structure!15, visible on=<2->] (p2) at (2.2,-1) {size $n/2$};
+  \node[box, fill=green!25, visible on=<3->] (s1) at (-2.2,-2) {solution};
+  \node[box, fill=green!25, visible on=<3->] (s2) at (2.2,-2) {solution};
+  \node[box, fill=orange!45, visible on=<4->] (s) at (0,-3) {solution of the problem};
+  \draw[->, visible on=<2->] (p) -- (p1); \draw[->, visible on=<2->] (p) -- (p2);
+  \draw[->, visible on=<3->] (p1) -- (s1); \draw[->, visible on=<3->] (p2) -- (s2);
+  \draw[->, visible on=<4->] (s1) -- (s); \draw[->, visible on=<4->] (s2) -- (s);
+\end{tikzpicture}
+\end{center}
+\note{Brute force tries every candidate of the whole problem. Divide and conquer never looks at the whole problem at once: it only solves small problems, and combines them. The gain comes from the combination step, when it is cheaper than solving the problem directly.}
+#+END_EXPORT
+
+** Binary search, seen again
+Search $x$ in the sorted array =a[lo..hi)=:
+
+#+begin_src java
+int search(int[] a, int x, int lo, int hi) {
+    if (lo >= hi) return -1;                 // empty: not found
+    int mid = (lo + hi) / 2;
+    if (a[mid] == x) return mid;
+    if (x < a[mid]) return search(a, x, lo, mid);    // left half
+    return search(a, x, mid + 1, hi);                // right half
+}
+#+end_src
+
+\pause
+- Divide: compare with the middle. Conquer: *one* half only. Combine: nothing.
+- Each call halves the array: $O(\log n)$.
+
+#+BEGIN_EXPORT latex
+\note{Binary search was the first improvement over linear search in the Hash Tables course. It is the simplest divide and conquer: one subproblem only, and no combination. Notice the convention a[lo..hi): lo included, hi excluded; the first call is search(a, x, 0, a.length).}
+#+END_EXPORT
+
+** Merge sort
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[ms/.style={draw, rounded corners=1pt, font=\scriptsize\ttfamily, inner sep=2pt}, line/.style={gray}]
+  \node[ms, fill=gray!8] (a0) at (3.85,0) {5 2 4 7 1 3 2 6};
+  \begin{scope}[visible on=<2->]
+    \node[ms, fill=gray!8] (b0) at (1.65,-0.62) {5 2 4 7};
+    \node[ms, fill=gray!8] (b1) at (6.05,-0.62) {1 3 2 6};
+    \draw[line] (a0) -- (b0); \draw[line] (a0) -- (b1);
+  \end{scope}
+  \begin{scope}[visible on=<3->]
+    \foreach \t [count=\g from 0] in {5 2, 4 7, 1 3, 2 6} {\node[ms, fill=gray!8] (c\g) at (0.55+\g*2.2,-1.24) {\t};}
+    \foreach \g/\l/\r in {0/0/1, 1/2/3} {\draw[line] (b\g) -- (c\l); \draw[line] (b\g) -- (c\r);}
+  \end{scope}
+  \begin{scope}[visible on=<4->]
+    \foreach \t [count=\g from 0] in {5, 2, 4, 7, 1, 3, 2, 6} {\node[ms, fill=structure!15] (d\g) at (\g*1.1,-1.86) {\t};}
+    \foreach \g/\l/\r in {0/0/1, 1/2/3, 2/4/5, 3/6/7} {\draw[line] (c\g) -- (d\l); \draw[line] (c\g) -- (d\r);}
+  \end{scope}
+  \begin{scope}[visible on=<5->]
+    \foreach \t [count=\g from 0] in {2 5, 4 7, 1 3, 2 6} {\node[ms, fill=green!25] (e\g) at (0.55+\g*2.2,-2.48) {\t};}
+    \foreach \g/\l/\r in {0/0/1, 1/2/3, 2/4/5, 3/6/7} {\draw[line] (d\l) -- (e\g); \draw[line] (d\r) -- (e\g);}
+  \end{scope}
+  \begin{scope}[visible on=<6->]
+    \node[ms, fill=green!25] (f0) at (1.65,-3.1) {2 4 5 7};
+    \node[ms, fill=green!25] (f1) at (6.05,-3.1) {1 2 3 6};
+    \foreach \g/\l/\r in {0/0/1, 1/2/3} {\draw[line] (e\l) -- (f\g); \draw[line] (e\r) -- (f\g);}
+  \end{scope}
+  \begin{scope}[visible on=<7->]
+    \node[ms, fill=orange!45] (g0) at (3.85,-3.72) {1 2 2 3 4 5 6 7};
+    \draw[line] (f0) -- (g0); \draw[line] (f1) -- (g0);
+  \end{scope}
+  \node[font=\scriptsize, gray, anchor=east, visible on=<2->] at (-0.5,-0.62) {divide};
+  \node[font=\scriptsize, gray, anchor=east, visible on=<4->] at (-0.5,-1.86) {size 1: sorted};
+  \node[font=\scriptsize, gray, anchor=east, visible on=<5->] at (-0.5,-2.48) {merge};
+\end{tikzpicture}
+\end{center}
+\note{Divide: cut the array in two halves, without looking at the values. Conquer: sort each half recursively; an array of one element is already sorted, this is the base case. Combine: merge the two sorted halves. All the work is in the merge. Merge sort was invented by John von Neumann in 1945.}
+#+END_EXPORT
+
+** Merging two sorted halves
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}
+  \cells{0.7}{1.2}{3} \vals{0.7}{1.2}{0/2, 1/4, 2/5, 3/7}
+  \begin{scope}[xshift=3.2cm] \cells{0.7}{1.2}{3} \vals{0.7}{1.2}{0/1, 1/2, 2/3, 3/6} \end{scope}
+  \node[font=\scriptsize, anchor=east] at (-0.1,1.5) {left};
+  \node[font=\scriptsize, anchor=west] at (6.1,1.5) {right};
+  \cells{0.7}{0}{7}
+  \node[font=\scriptsize, anchor=east] at (-0.1,0.3) {result};
+  \begin{scope}[visible on=<2->] \vals[green!25]{0.7}{0}{0/1} \end{scope}
+  \begin{scope}[visible on=<3->] \vals[green!25]{0.7}{0}{1/2} \end{scope}
+  \begin{scope}[visible on=<4->] \vals[green!25]{0.7}{0}{2/2} \end{scope}
+  \begin{scope}[visible on=<5->] \vals[green!25]{0.7}{0}{3/3} \end{scope}
+  \begin{scope}[visible on=<6->] \vals[green!25]{0.7}{0}{4/4} \end{scope}
+  \begin{scope}[visible on=<7->] \vals[green!25]{0.7}{0}{5/5} \end{scope}
+  \begin{scope}[visible on=<8->] \vals[green!25]{0.7}{0}{6/6} \end{scope}
+  \begin{scope}[visible on=<9->] \vals[green!25]{0.7}{0}{7/7} \end{scope}
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <10->
+- Compare the first remaining element of each half; move the smaller one to the result.
+- Each comparison moves one element: merging $n$ elements costs $O(n)$.
+
+#+BEGIN_EXPORT latex
+\note{Step by step: 2 vs 1, take 1 (right); 2 vs 2, take the left 2 (on a tie, take the left one: the sort stays stable); 4 vs 2, take 2; 4 vs 3, take 3; 4 vs 6, take 4; 5 vs 6, take 5; 7 vs 6, take 6; the right half is empty, copy the rest: 7. The merge needs a second array: merge sort uses O(n) extra memory.}
+#+END_EXPORT
+
+** Merge sort: the code
+#+begin_src java
+void mergeSort(int[] a, int lo, int hi) {     // sorts a[lo..hi)
+    if (hi - lo <= 1) return;                  // 0 or 1 element: sorted
+    int mid = (lo + hi) / 2;
+    mergeSort(a, lo, mid);                     // sort the left half
+    mergeSort(a, mid, hi);                     // sort the right half
+    merge(a, lo, mid, hi);                     // combine
+}
+
+void merge(int[] a, int lo, int mid, int hi) {
+    int[] tmp = new int[hi - lo];
+    int i = lo, j = mid, k = 0;
+    while (i < mid && j < hi)
+        tmp[k++] = (a[i] <= a[j]) ? a[i++] : a[j++];
+    while (i < mid) tmp[k++] = a[i++];         // rest of the left half
+    while (j < hi)  tmp[k++] = a[j++];         // rest of the right half
+    System.arraycopy(tmp, 0, a, lo, tmp.length);
+}
+#+end_src
+
+#+BEGIN_EXPORT latex
+\note{The test a[i] <= a[j], with <= and not <, takes the left element on a tie: equal elements keep their order, the sort is stable. This matters when sorting students by grade after sorting them by name. First call: mergeSort(a, 0, a.length).}
+#+END_EXPORT
+
+* Cost of a divide and conquer algorithm
+
+** Writing the recurrence
+$T(n)$: the time to solve a problem of size $n$.
+
+#+ATTR_BEAMER: :overlay <+->
+- Merge sort: two halves, then a merge in $O(n)$:
+  \[ T(n) = 2\,T(n/2) + c\,n, \qquad T(1) = c \]
+- Binary search: one half, then a constant amount of work:
+  \[ T(n) = T(n/2) + c, \qquad T(1) = c \]
+- How do we get $O(\dots)$ from such an equation? Draw the *recursion tree*.
+
+#+BEGIN_EXPORT latex
+\note{The recurrence reads directly from the code: one term per recursive call, plus the work done in the call itself (divide and combine). c is a constant: the cost of a few operations. We assume n is a power of 2, so that the halves are exact; the result is the same for any n.}
+#+END_EXPORT
+
+** The recursion tree of merge sort
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[every node/.style={rnode}, line/.style={gray}]
+  \node (r) at (3.5,0) {$n$};
+  \node (l1) at (1.5,-0.8) {$n/2$}; \node (r1) at (5.5,-0.8) {$n/2$};
+  \foreach \x [count=\i from 0] in {0.5, 2.5, 4.5, 6.5} {\node (q\i) at (\x,-1.6) {$n/4$};}
+  \draw[line] (r) -- (l1); \draw[line] (r) -- (r1);
+  \draw[line] (l1) -- (q0); \draw[line] (l1) -- (q1); \draw[line] (r1) -- (q2); \draw[line] (r1) -- (q3);
+  \node[draw=none, fill=none] at (3.5,-2.25) {$\vdots$};
+  \foreach \x in {0,1,2,3,4,5,6,7} {\node at (\x,-3) {$1$};}
+  \node[draw=none, fill=none, font=\scriptsize] at (3.5,-3.45) {$n$ leaves};
+  \begin{scope}[visible on=<2->, every node/.style={font=\scriptsize, anchor=west}]
+    \node at (8,0) {$c\,n$};
+    \node at (8,-0.8) {$2 \times c\,\frac{n}{2} = c\,n$};
+    \node at (8,-1.6) {$4 \times c\,\frac{n}{4} = c\,n$};
+    \node at (8,-3) {$n \times c = c\,n$};
+  \end{scope}
+  \draw[visible on=<3->, decorate, decoration={brace, amplitude=5pt}, thick] (11.2,0.2) -- (11.2,-3.2) node[midway, right=6pt, draw=none, fill=none, font=\scriptsize, align=left] {$\log_2 n + 1$\\levels};
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+BEGIN_EXPORT latex
+\uncover<4->{
+\[ T(n) = c\,n\,(\log_2 n + 1) = O(n \log n) \]}
+\note{Each node is labelled with the size of its subproblem; the work done inside the node, the merge, is c times that size. At each level, the sizes add up to n: every level costs c n. The size is halved at each level, so after log2 n levels we reach size 1. For n = 8: 4 levels (8, 4, 2, 1), as in the merge sort example.}
+#+END_EXPORT
+
+** The recursion tree of binary search
+#+BEGIN_EXPORT latex
+\begin{columns}[c]
+\begin{column}{0.3\textwidth}
+\begin{center}
+\begin{tikzpicture}[every node/.style={rnode}, line/.style={gray}]
+  \node (a) at (0,0) {$n$}; \node (b) at (0,-0.8) {$n/2$}; \node (c) at (0,-1.6) {$n/4$};
+  \node[draw=none, fill=none] (d) at (0,-2.3) {$\vdots$}; \node (e) at (0,-3) {$1$};
+  \draw[line] (a) -- (b); \draw[line] (b) -- (c);
+  \foreach \y in {0, -0.8, -1.6, -3} {\node[draw=none, fill=none, font=\scriptsize, anchor=west] at (0.7,\y) {$c$};}
+\end{tikzpicture}
+\end{center}
+\end{column}
+\begin{column}{0.68\textwidth}
+\begin{itemize}
+\item<2-> One call per level: the tree is a chain.
+\item<3-> Each call costs $c$, there are $\log_2 n + 1$ levels:
+\[ T(n) = c\,(\log_2 n + 1) = O(\log n) \]
+\item<4-> The method: \textbf{size of each node} $\rightarrow$ \textbf{work per level} $\rightarrow$ \textbf{number of levels} $\rightarrow$ \textbf{sum}.
+\end{itemize}
+\end{column}
+\end{columns}
+\note{The two trees have the same height, log2 n + 1. The difference comes from the work per level: constant for binary search, c n for merge sort. Always follow the same four steps; they work for every recurrence of this course.}
+#+END_EXPORT
+
+** Why $O(n \log n)$ matters
+Sorting $n$ elements, at $10^9$ operations per second:
+
+| $n$           | $n^2$ (selection sort) | $n \log_2 n$ (merge sort) |
+|---------------+------------------------+---------------------------|
+| $10^3$        | 1 ms                   | 10 \(\mu\)s                |
+| $10^6$        | 17 minutes             | 20 ms                     |
+| $10^9$        | 32 years               | 30 s                      |
+
+\pause
+- Java (=Arrays.sort= on objects) and Python (=sorted=) use *TimSort*, a merge sort improved for partly sorted data.
+- Price: $O(n)$ extra memory for the merges.
+
+#+BEGIN_EXPORT latex
+\note{Selection sort and insertion sort make about n squared comparisons. The values are orders of magnitude, constants ignored. TimSort (Tim Peters, 2002, for Python) detects the already sorted runs in the data and merges them. For arrays of primitive types, Java uses a quicksort variant, which needs no extra array.}
+#+END_EXPORT
+
+** Exercise: recurrences
+For each algorithm, write the recurrence, draw the recursion tree, and give the cost.
+
+1. =max(a, lo, hi)=: the maximum of =a[lo..hi)=, as the larger of the maximums of the two halves.
+2. Fast power: $x^n = \left(x^{n/2}\right)^2$ if $n$ is even, $x \times \left(x^{\lfloor n/2 \rfloor}\right)^2$ if $n$ is odd. Write the code.
+3. In question 2, what happens if the code calls =power(x, n / 2) * power(x, n / 2)=?
+
+#+BEGIN_EXPORT latex
+\note{Answers. 1. T(n) = 2 T(n/2) + c. The tree has 1, 2, 4, ..., n nodes per level, each costing c: in total about 2n nodes, so O(n). No better than a loop, but no worse. 2. long h = power(x, n / 2); return (n \% 2 == 0) ? h * h : h * h * x; with the base case n == 0 returns 1. T(n) = T(n/2) + c: O(log n), instead of O(n) for the version of the recursion exercise. 3. Two calls instead of one: T(n) = 2 T(n/2) + c, which is O(n) again. Computing the half once and reusing it is what makes the algorithm fast.}
+#+END_EXPORT
+
+* Back to the maximum subarray
+
+** Split in the middle
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}
+  \gains
+  \draw[dashed, thick] (4.5,-0.4) -- (4.5,1.1);
+  \node[font=\scriptsize] at (2.25,1.0) {left half};
+  \node[font=\scriptsize] at (6.3,1.0) {right half};
+  \begin{scope}[visible on=<2>] \vals[green!25]{0.9}{0}{3/$4$} \end{scope}
+  \begin{scope}[visible on=<3>] \vals[green!25]{0.9}{0}{8/$4$} \end{scope}
+  \begin{scope}[visible on=<4->] \vals[orange!45]{0.9}{0}{3/$4$, 4/$-1$, 5/$2$, 6/$1$} \end{scope}
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+The best period is:
+
+#+ATTR_BEAMER: :overlay <2->
+- entirely in the left half: recursive call, best $= 4$;
+- or entirely in the right half: recursive call, best $= 4$;
+- or it *crosses the middle*: best $= 6$. How do we find it?
+
+#+BEGIN_EXPORT latex
+\note{The first two cases are the same problem on a half: two recursive calls. The third case is new: a period that contains the last day of the left half and the first day of the right half. The answer is the largest of the three values. Ask: is the crossing case also a subproblem of the same type? No, and it is easier: it must contain the middle.}
+#+END_EXPORT
+
+** The best period crossing the middle
+It ends the left part at day =mid=, and starts the right part at day =mid + 1=.
+
+#+BEGIN_EXPORT latex
+\begin{columns}[t]
+\begin{column}{0.48\textwidth}
+\textbf{Extend to the left} from \texttt{mid} $= 4$:
+
+\smallskip
+\begin{tabular}{l|ccccc}
+day & 4 & 3 & 2 & 1 & 0 \\ \hline
+sum & $-1$ & \alert<2->{\textbf{3}} & 0 & 1 & $-1$
+\end{tabular}
+\end{column}
+\begin{column}{0.48\textwidth}
+\uncover<3->{\textbf{Extend to the right} from \texttt{mid + 1} $= 5$:
+
+\smallskip
+\begin{tabular}{l|cccc}
+day & 5 & 6 & 7 & 8 \\ \hline
+sum & 2 & \alert<3->{\textbf{3}} & $-2$ & 2
+\end{tabular}}
+\end{column}
+\end{columns}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <4->
+- The two parts are independent: take the best of each side. $3 + 3 = 6$.
+- One pass over the array: $O(n)$.
+
+#+BEGIN_EXPORT latex
+\note{The left part of a crossing period must end at mid, so it is one of the suffixes of the left half: we try them all, in one pass, with a running sum. Same thing on the right with the prefixes of the right half. The best crossing period is the best suffix plus the best prefix: days 3 to 6.}
+#+END_EXPORT
+
+** The code: three cases
+#+begin_src java
+int maxSub(int[] a, int lo, int hi) {         // best period in a[lo..hi]
+    if (lo == hi) return a[lo];               // one day
+    int mid = (lo + hi) / 2;
+    int left  = maxSub(a, lo, mid);
+    int right = maxSub(a, mid + 1, hi);
+    int cross = maxCrossing(a, lo, mid, hi);
+    return Math.max(Math.max(left, right), cross);
+}
+#+end_src
+
+\pause
+- Base case: one day, the only period is this day.
+- First call: =maxSub(a, 0, a.length - 1)=.
+
+#+BEGIN_EXPORT latex
+\note{Here the bounds are inclusive, a[lo..hi], because the base case is a single day. The three cases of the previous slide become three lines: two recursive calls, and one call to maxCrossing. The answer is the largest of the three.}
+#+END_EXPORT
+
+** The code: the crossing period
+#+begin_src java
+int maxCrossing(int[] a, int lo, int mid, int hi) {
+    int sum = 0, bestLeft = Integer.MIN_VALUE;
+    for (int i = mid; i >= lo; i--) {         // periods a[i..mid]
+        sum += a[i];
+        bestLeft = Math.max(bestLeft, sum);
+    }
+    sum = 0;
+    int bestRight = Integer.MIN_VALUE;
+    for (int j = mid + 1; j <= hi; j++) {     // periods a[mid+1..j]
+        sum += a[j];
+        bestRight = Math.max(bestRight, sum);
+    }
+    return bestLeft + bestRight;
+}
+#+end_src
+
+#+BEGIN_EXPORT latex
+\note{bestLeft and bestRight start at the smallest int, not at 0: a crossing period must contain at least the days mid and mid + 1.}
+#+END_EXPORT
+
+** Cost
+#+ATTR_BEAMER: :overlay <+->
+- Two halves, plus =maxCrossing= in $O(n)$:
+  \[ T(n) = 2\,T(n/2) + c\,n \]
+- The *same recurrence* as merge sort, so the same tree: $O(n \log n)$.
+
+#+BEGIN_EXPORT latex
+\uncover<3->{
+\begin{center}
+\begin{tabular}{lll}
+\textbf{Algorithm} & \textbf{Cost} & \textbf{$n = 10^6$ days} \\ \hline
+three loops & $O(n^3)$ & 32 years \\
+two loops & $O(n^2)$ & 17 minutes \\
+divide and conquer & $O(n \log n)$ & 20 ms
+\end{tabular}
+\end{center}}
+\note{Same recurrence, same cost: we do not need to draw the tree again. Mention that an O(n) algorithm exists (Kadane's algorithm): it scans the array once and keeps the best period ending at the current day. It is a simple form of dynamic programming, next course.}
+#+END_EXPORT
+
+* Summary
+
+** Key takeaways
+- *Brute force* tries every candidate: simple and correct, but $2^n$ or $n!$ candidates are out of reach.
+- *Recursion*: a base case, and calls on smaller problems. Each call costs a frame on the stack.
+- Recursion naturally enumerates subsets and permutations: one level of the tree per decision.
+- *Divide and conquer*: divide, solve the parts recursively, combine.
+- Its cost: write the recurrence, draw the recursion tree, add up the work of each level.
+
+#+BEGIN_EXPORT latex
+\note{Ask students to recall the three solutions of the maximum subarray, and what changed between them: the brute force tries every period; divide and conquer only looks at the periods that cross the middle, at each level of the recursion.}
+#+END_EXPORT
+
+** An open question: Fibonacci
+#+begin_src java
+long fib(int n) {
+    if (n <= 1) return n;
+    return fib(n - 1) + fib(n - 2);
+}
+#+end_src
+
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[level distance=0.55cm,
+    level 1/.style={sibling distance=5.2cm}, level 2/.style={sibling distance=2.6cm},
+    level 3/.style={sibling distance=1.3cm}, level 4/.style={sibling distance=0.7cm},
+    edge from parent/.style={draw, gray}, every node/.style={rnode},
+    f3/.style={onslide=<2->{fill=orange!45}}, f2/.style={onslide=<3->{fill=green!25}}]
+  \node {f(5)}
+    child {node {f(4)}
+      child {node[f3] {f(3)} child {node[f2] {f(2)} child {node {f(1)}} child {node {f(0)}}} child {node {f(1)}}}
+      child {node[f2] {f(2)} child {node {f(1)}} child {node {f(0)}}}}
+    child {node[f3] {f(3)}
+      child {node[f2] {f(2)} child {node {f(1)}} child {node {f(0)}}}
+      child {node {f(1)}}};
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <2->
+- =f(3)= is computed twice, =f(2)= three times. =fib(50)=: about $4 \cdot 10^{10}$ calls.
+- Why compute the same subproblem again and again? (next course)
+
+#+BEGIN_EXPORT latex
+\note{This looks like divide and conquer, but the two subproblems are not independent: they overlap. The number of calls grows like the Fibonacci numbers themselves, about 1.6 to the power n. fib(50) needs 2 fib(51) - 1 calls, about 40 billion: tens of seconds, for a value that a loop computes with 50 additions. Ask students how they would avoid the repeated calls: remember the values already computed. This is dynamic programming, the subject of the next course, together with greedy algorithms.}
+#+END_EXPORT

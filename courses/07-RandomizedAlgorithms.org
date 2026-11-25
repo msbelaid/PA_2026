@@ -1,0 +1,594 @@
+#+TITLE: Randomized algorithms and metaheuristics
+#+AUTHOR: Mohammed Said BELAID @@latex:\\@@ said.belaid@univ-usto.dz @@latex:\\ \href{https://github.com/msbelaid}{github.com/msbelaid}@@
+#+SUBTITLE: Using chance to find good solutions, fast
+#+DATE: 25/11/2026
+#+EMAIL: said.belaid@univ-usto.dz
+#+OPTIONS: H:2
+#+startup: beamer
+#+latex_header: \mode<beamer>{\usetheme{Antibes}}
+#+OPTIONS: listings:t
+#+LaTeX_CLASS: beamer
+#+LATEX_CLASS_OPTIONS: [aspectratio=169]
+#+LATEX_HEADER: \usepackage{listings}
+#+LATEX_HEADER: \usepackage{tikz}
+#+LATEX_HEADER: \usetikzlibrary{positioning, decorations.pathreplacing, calc}
+#+LATEX_HEADER: \tikzset{onslide/.code args={<#1>#2}{\only<#1>{\pgfkeysalso{#2}}}}
+#+LATEX_HEADER: \tikzset{alt/.code args={<#1>#2#3}{\alt<#1>{\pgfkeysalso{#2}}{\pgfkeysalso{#3}}}}
+#+LATEX_HEADER: \tikzset{invisible/.style={opacity=0}, visible on/.style={alt={#1{}{invisible}}}}
+#+LATEX_HEADER: % The landscape of 10 solutions (0 to 9) and their costs
+#+LATEX_HEADER: \tikzset{pics/land/.style={code={\foreach \x/\f in {0/7,1/5,2/4,3/6,4/8,5/7,6/5,7/3,8/1,9/4} {\fill[structure!25] (\x*0.8-0.3,0) rectangle (\x*0.8+0.3,\f*0.3); \node[font=\tiny, gray] at (\x*0.8,-0.2) {\x}; \node[font=\tiny] at (\x*0.8,\f*0.3+0.15) {\f};} \draw[gray] (-0.4,0) -- (7.6,0);}}}
+#+LATEX_HEADER: \tikzset{hop/.style={->, thick, orange!80!black, shorten >=1pt, shorten <=1pt}}
+#+LATEX_HEADER: % A tour as a row of boxes
+#+LATEX_HEADER: \tikzset{gene/.style={draw, minimum width=0.5cm, minimum height=0.5cm, font=\scriptsize, fill=white}, keep/.style={fill=orange!35}, from2/.style={fill=structure!20}}
+
+#+LATEX_HEADER: \lstset{
+#+LATEX_HEADER:   basicstyle=\ttfamily\fontsize{7.5}{9}\selectfont,
+#+LATEX_HEADER:   keywordstyle=\color{blue!70!black}\bfseries,
+#+LATEX_HEADER:   commentstyle=\color{green!45!black}\itshape,
+#+LATEX_HEADER:   stringstyle=\color{red!65!black},
+#+LATEX_HEADER:   backgroundcolor=\color{gray!8},
+#+LATEX_HEADER:   frame=single,
+#+LATEX_HEADER:   rulecolor=\color{gray!50},
+#+LATEX_HEADER:   breaklines=true,
+#+LATEX_HEADER:   showstringspaces=false
+#+LATEX_HEADER: }
+#+LaTeX_HEADER: \logo{\includegraphics[height=1cm]{../images/usto.png}}
+#+LATEX_HEADER: \usepackage{xcolor}
+#+LATEX_HEADER: \AtBeginSection[]{\begin{frame}<beamer>{Outline}\tableofcontents[currentsection]\end{frame}}
+
+
+
+* The open question: 1 000 clients
+
+** 1 000 clients
+#+ATTR_LATEX: :align lll
+| Method              | 1 000 clients               | Limit                     |
+|---------------------+-----------------------------+---------------------------|
+| Brute force         | $999!$ orders: never        | about 12 clients          |
+| Dynamic programming | $2^{1000}$ subsets: never   | about 25 clients          |
+| Branch and bound    | maybe, maybe not            | depends on the bound      |
+| Greedy              | at once, but 25 % too long  | none, but no guarantee    |
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- The exact methods are too slow, greedy is not good enough.
+- Can we get a tour within a few % of the best, in a few seconds?
+
+#+BEGIN_EXPORT latex
+\note{Back to the open question of course 06. 999 factorial has more than 2500 digits. Branch and bound with very good bounds can solve such instances (the Concorde solver solved tours of tens of thousands of cities), but it needs years of research in its bounds, and it can still take hours. Greedy gives a tour in milliseconds, with long legs at the end, typically 25 percent above the best. Today: methods in between, which improve a tour with the help of chance. They are what delivery companies use every day.}
+#+END_EXPORT
+
+** Giving up the guarantee
+#+BEGIN_EXPORT latex
+\begin{block}{Heuristic}
+A method that finds a \emph{good} solution fast, \emph{without a guarantee} that it is the best one.
+\end{block}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- Greedy (course 05) was our first heuristic: fast, and sometimes far from the best.
+- Today: start from a solution, and *improve* it step by step.
+- *Chance* helps to try many directions, and to escape the traps.
+- We choose the *time budget*: more time, a better tour.
+
+#+BEGIN_EXPORT latex
+\note{In real life, a tour 2 percent above the best, found in one second, is worth more than the best tour found in a week. The methods of today give no proof of quality: we compare them on test instances. The word heuristic comes from Greek, to find, like eureka. We start by fixing the vocabulary common to all these methods.}
+#+END_EXPORT
+
+* One solution or a population?
+
+** Metaheuristics
+#+BEGIN_EXPORT latex
+\begin{block}{Metaheuristic}
+A general search strategy, for \emph{any} optimization problem, that uses chance or memory to find good solutions.
+\end{block}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <+(1)->
+What we must give for a problem:
+- A *solution*: for the tour, an order of the clients (a permutation).
+- A *cost* to minimize: the length of the tour. (Or a value to maximize.)
+- *Neighbours*: the solutions reached by a small change, a *move*.
+
+#+BEGIN_EXPORT latex
+\note{Meta: the strategy does not depend on the problem. The same simulated annealing code works for tours, timetables or the knapsack: only the three ingredients change. For the knapsack, a solution is the set of sacks taken, the value is the total value (with a penalty if too heavy), a move adds or removes one sack. Choosing the neighbours is the important design decision: small enough to be evaluated fast, rich enough to reach good solutions.}
+#+END_EXPORT
+
+** Two families
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[x=1cm, y=1cm, dot/.style={circle, fill=orange!80!black, inner sep=1.3pt}]
+  \foreach \s/\dx in {L/0, R/7} {
+    \begin{scope}[xshift=\dx cm]
+      \draw[gray, thick, domain=0:5, smooth, samples=60] plot (\x, {1.1+0.45*sin(150*\x)-0.15*\x});
+      \node[font=\tiny, gray, anchor=east] at (0,1.4) {cost};
+    \end{scope}}
+  \foreach \x in {0.3, 0.8, 1.4, 2.0, 2.9} {\pgfmathsetmacro\y{1.1+0.45*sin(150*\x)-0.15*\x} \node[dot] at (\x,\y) {};}
+  \foreach \a/\b in {0.3/0.8, 0.8/1.4, 1.4/2.0, 2.0/2.9} {
+    \pgfmathsetmacro\ya{1.1+0.45*sin(150*\a)-0.15*\a+0.15} \pgfmathsetmacro\yb{1.1+0.45*sin(150*\b)-0.15*\b+0.15}
+    \draw[->, orange!80!black, thick, shorten >=2pt, shorten <=2pt] (\a,\ya) -- (\b,\yb);}
+  \foreach \x in {0.2, 0.7, 1.1, 1.6, 2.2, 2.6, 3.1, 3.5, 4.1, 4.6} {\pgfmathsetmacro\y{1.1+0.45*sin(150*\x)-0.15*\x} \node[dot, fill=structure] at (7+\x,\y) {};}
+  \node[font=\scriptsize] at (2.5,-0.2) {one solution, moving};
+  \node[font=\scriptsize] at (9.5,-0.2) {a population, evolving};
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_LATEX: :align lll :font \small
+|          | Single solution                   | Population                            |
+|----------+-----------------------------------+---------------------------------------|
+| State    | one current solution              | many solutions at once                |
+| Step     | move to a neighbour               | select, combine and mutate solutions  |
+| Strength | digs deep, fast (*intensification*) | explores widely (*diversification*)   |
+| Examples | hill climbing, annealing, tabu    | genetic algorithms, ant colony optim. |
+
+#+BEGIN_EXPORT latex
+\note{The curve is a landscape: each point is a solution, its height is its cost, and we look for the lowest point. A single-solution method is a walker: it looks only around itself, and goes down fast, but it can get stuck in a valley. A population is a group of walkers spread everywhere, which share information: slower, but less likely to miss the good region. Intensification and diversification are the two forces every metaheuristic must balance. We start with the walker.}
+#+END_EXPORT
+
+* Local search
+
+** Neighbours of a tour: 2-opt
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[city/.style={circle, draw, fill=structure!15, font=\tiny, inner sep=1.5pt, minimum size=0.5cm},
+    road/.style={gray!30}, dist/.style={font=\tiny, fill=white, inner sep=0.8pt},
+    leg/.style={very thick, orange!80!black, shorten >=1pt, shorten <=1pt},
+    gone/.style={very thick, red!60, dashed, shorten >=1pt, shorten <=1pt},
+    new/.style={very thick, green!50!black, shorten >=1pt, shorten <=1pt}]
+  \foreach \s/\dx in {L/0, R/7} {
+    \begin{scope}[xshift=\dx cm, yscale=0.85]
+      \node[city, fill=yellow!35] (W\s) at (240:1.9) {W};
+      \node[city] (A\s) at (300:1.9) {A}; \node[city] (C\s) at (40:1.9) {C}; \node[city] (B\s) at (190:1.9) {B};
+    \end{scope}}
+  \draw[leg] (WL) -- (AL); \draw[leg] (BL) -- (CL);
+  \draw[leg, onslide=<2->{gone}] (AL) -- (BL); \draw[leg, onslide=<2->{gone}] (CL) -- (WL);
+  \path (WL) -- node[dist] {3} (AL); \path (AL) -- node[dist, pos=0.28] {7} (BL);
+  \path (BL) -- node[dist] {10} (CL); \path (CL) -- node[dist, pos=0.72] {10} (WL);
+  \node[font=\scriptsize] at (0,-2.05) {W A B C W: 30 km};
+  \begin{scope}[visible on=<3->]
+    \draw[leg] (WR) -- (AR); \draw[new] (AR) -- (CR); \draw[leg] (CR) -- (BR); \draw[new] (BR) -- (WR);
+    \path (WR) -- node[dist] {3} (AR); \path (AR) -- node[dist] {8} (CR);
+    \path (CR) -- node[dist] {10} (BR); \path (BR) -- node[dist] {4} (WR);
+    \node[font=\scriptsize] at (7,-2.05) {W A C B W: 25 km};
+  \end{scope}
+  \node[visible on=<3->, font=\Large] at (3.5,0) {$\Rightarrow$};
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <2->
+- A *2-opt move*: remove two roads, reconnect the other way: *reverse* a part of the tour.
+#+ATTR_BEAMER: :overlay <4->
+- Gain: $8 + 4 - 7 - 10 = -5$ km, computed in $O(1)$: only 4 roads change.
+- $n$ clients: about $\frac{n^2}{2}$ neighbours. For 1 000 clients: 500 000.
+
+#+BEGIN_EXPORT latex
+\note{The greedy tour of course 05 crosses itself. Remove the two crossing roads, A to B and C to W, and reconnect: A to C and B to W. Between them, the part B C is now visited backwards: a 2-opt move reverses a slice of the tour. The change of length only involves the two removed roads and the two new ones, so we do not need to recompute the whole tour. A 2-opt move always removes a crossing when there is one, which is why 2-opt tours never cross themselves. 2-opt: Croes, 1958.}
+#+END_EXPORT
+
+** Hill climbing
+#+BEGIN_EXPORT latex
+\begin{block}{Hill climbing (local search)}
+Start from a solution. While a neighbour is better, move to it. Stop when no neighbour is better.
+\end{block}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <+(1)->
+1. Start from the greedy tour.
+2. Try the 2-opt moves one by one; the first one that shortens the tour is applied at once.
+3. A full pass with no improving move: stop.
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- It stops at a solution with *no better neighbour*: maybe not the best one.
+- 1 000 clients: 2 867 km become 2 492 km, in 0.1 s (331 moves).
+
+#+BEGIN_EXPORT latex
+\note{The name comes from maximization: always climb, never go down. For a minimization it should be called hill descent, but the name stayed. It stops because the length decreases at each move and there are finitely many tours. This version takes the first improving move it finds; another version scans all the neighbours and takes the best one. Each pass tries the 500 000 moves, each one in O(1) thanks to the formula of the previous slide; applying a move reverses a slice, in O(n). A good start saves many moves: from the greedy tour, only 331 moves are needed.}
+#+END_EXPORT
+
+** Stuck in a local optimum
+#+BEGIN_EXPORT latex
+\begin{center}
+\scalebox{0.85}{\begin{tikzpicture}
+  \pic at (0,0) {land};
+  \node[font=\tiny, gray, anchor=east] at (-0.5,-0.2) {solution};
+  \node[font=\tiny, gray, anchor=east] at (-0.5,1.2) {cost};
+  \begin{scope}[visible on=<2->]
+    \draw[hop] (0,2.45) to[bend left=50] (0.8,1.85); \draw[hop] (0.8,1.85) to[bend left=50] (1.6,1.55);
+    \node[font=\tiny, red!70!black] at (1.6,2.6) {stuck};
+  \end{scope}
+  \begin{scope}[visible on=<3->]
+    \draw[green!50!black, thick] (6.4,0.65) circle (0.18); \node[font=\tiny, green!40!black] at (6.4,1.1) {the best};
+  \end{scope}
+\end{tikzpicture}}
+\end{center}
+#+END_EXPORT
+
+Ten solutions in a row; the neighbours of a solution are the two next to it.
+
+#+ATTR_BEAMER: :overlay <2->
+- From 0: $7 \to 5 \to 4$. Solution 2 is a *local optimum*: both neighbours cost more.
+#+ATTR_BEAMER: :overlay <3->
+- The *global optimum* (cost 1) is behind the hill of solution 4: hill climbing never goes up.
+- On the tour: 2 492 km, but the best tour is probably about 2 300 km.
+
+#+BEGIN_EXPORT latex
+\note{A toy landscape, to see the problem: real landscapes have huge numbers of solutions and of local optima, but the same shape. To reach solution 8 from solution 2, the search must first accept worse solutions: 6, then 8, then 7. The rest of the course: three ways to escape. Start again from elsewhere, accept some worse moves, or remember where we have been. The estimate of 2300 km comes from theory on random cities (Beardwood, Halton and Hammersley): about 0.71 times the square root of the number of cities times the area, plus a correction for the borders.}
+#+END_EXPORT
+
+* Escaping local optima
+
+** Random restarts
+#+BEGIN_EXPORT latex
+\begin{center}
+\scalebox{0.75}{\begin{tikzpicture}
+  \pic at (0,0) {land};
+  \fill[structure!50, opacity=0.25] (-0.4,-0.35) rectangle (3.55,2.95);
+  \fill[green!50, opacity=0.25] (3.65,-0.35) rectangle (7.6,2.95);
+  \node[font=\tiny] at (1.6,3.15) {start here: end at 2};
+  \node[font=\tiny] at (5.6,3.15) {start here: end at 8};
+\end{tikzpicture}}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- Run hill climbing from *random* starts, keep the best result.
+- Here, each run finds the best one time in 2: 10 runs all miss it 1 time in 1 024.
+- Tour: 10 random starts give 2 545 km, *worse* than one start from greedy (2 492).
+- Big problems have a huge number of local optima: a good *start* matters.
+
+#+BEGIN_EXPORT latex
+\note{The set of starts that lead to a local optimum is its basin of attraction: here solutions 0 to 4 lead to 2, solutions 5 to 9 lead to 8. Restarts work well when there are few basins. On the tour, a random tour is so bad (52746 km) that 2-opt from it ends in a mediocre local optimum: the ten runs gave between 2545 and 2625 km. Restarts are independent: they forget everything. The next two methods continue from the local optimum instead.}
+#+END_EXPORT
+
+** Simulated annealing: the idea
+#+BEGIN_EXPORT latex
+\begin{block}{Simulated annealing (Kirkpatrick, Gelatt, Vecchi, 1983)}
+Pick a \emph{random} neighbour. Better: move. Worse by $\Delta$: move anyway with probability $e^{-\Delta / T}$.
+\end{block}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- $T$ is the *temperature*. It decreases slowly during the search.
+- Hot: almost every move is accepted, the search wanders (diversification).
+- Cold: only improvements, it is hill climbing (intensification).
+- Named after metal annealing: cooled slowly, the atoms find a low-energy arrangement.
+
+#+BEGIN_EXPORT latex
+\note{Annealing is how blacksmiths and glassmakers make a material less brittle: heat it, then cool it slowly. Cooled too fast (quenching), the atoms freeze in a disordered state, a local optimum of energy. The algorithm imitates the physics: the probability formula is the one of statistical physics (Metropolis, 1953). A small degradation is accepted more easily than a big one, and less and less often as the temperature falls. The algorithm can climb out of the valley of solution 2 while it is still hot.}
+#+END_EXPORT
+
+** Simulated annealing: the temperature
+Probability of accepting a move that is $\Delta$ km worse: $e^{-\Delta / T}$.
+
+#+ATTR_LATEX: :align r|rrr
+| $T$ | $\Delta = 1$ | $\Delta = 10$ | $\Delta = 50$ |
+|-----+--------------+---------------+---------------|
+| 100 |         0.99 |          0.90 |          0.61 |
+|  10 |         0.90 |          0.37 |         0.007 |
+|   1 |         0.37 |     0.000 05  |     $\approx 0$ |
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- Cooling: $T \leftarrow \alpha \cdot T$ after each step, with $\alpha$ just below 1 (0.999 999 5).
+- To tune: the start temperature, $\alpha$, the number of steps. Slower cooling: better, but longer.
+
+#+BEGIN_EXPORT latex
+\note{Read the table by rows: at a high temperature, even a 50 km degradation is accepted more than half of the time; at T = 1, a 10 km degradation almost never. A good start temperature accepts a large part of the bad moves at the beginning; it depends on the typical size of a move, so it is tuned on the problem. The cooling here is geometric: after 20 million steps with alpha = 0.9999995, T is divided by about 22 000. The probability is exact for T = 1 and Delta = 10: e to the power -10 is 0.000045.}
+#+END_EXPORT
+
+** Simulated annealing: the algorithm
+#+ATTR_BEAMER: :overlay <+(1)->
+1. Start from the greedy tour, at a temperature $T$ (here 30).
+2. Pick two random positions: a random 2-opt move, of gain $\Delta$.
+3. $\Delta < 0$: apply it. Otherwise, apply it if a random number in $[0, 1)$ is below $e^{-\Delta / T}$.
+4. Keep a copy of the *best* tour seen. Cool down: $T \leftarrow \alpha \cdot T$.
+5. Repeat from 2 until the number of steps is reached; return the best tour.
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- From greedy: 2 455 km in 2 s, and 2 376 km in 25 s with a 10 times slower cooling.
+
+#+BEGIN_EXPORT latex
+\note{It is hill climbing with two changes: a random neighbour instead of a scan, and the acceptance test of step 3, which is how a program makes an event happen with a given probability. We keep a copy of the best tour seen, because the current tour may have moved away from it when the temperature was high. Both runs start at T = 30 and end at the same low temperature; the second run cools 10 times more slowly, with 10 times more steps (200 million), and finds a tour 3 percent shorter. This is the typical behaviour: more time, a better tour, with diminishing returns.}
+#+END_EXPORT
+
+** Tabu search: the idea
+#+BEGIN_EXPORT latex
+\begin{block}{Tabu search (Glover, 1986)}
+Always move to the \emph{best} neighbour, even if it is worse. Forbid (\emph{tabu}) the recent moves, so as not to come back.
+\end{block}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- No chance here: *memory* replaces it.
+- The *tabu list*: the last moves, or the last solutions, forbidden for a few steps (the *tenure*).
+- *Aspiration*: a tabu move is allowed anyway if it gives a new best solution.
+- Return the best solution seen.
+
+#+BEGIN_EXPORT latex
+\note{Fred Glover named it after the word for something forbidden. At a local optimum, the best neighbour is worse: we take it, and we leave the valley. Without memory, the next step would bring us straight back down: the best neighbour of the new solution is the local optimum we just left. The tabu list prevents this cycle. The tenure is a parameter: too short, the search cycles; too long, it forbids too much. Tabu search is deterministic, but many versions add some randomness.}
+#+END_EXPORT
+
+** Tabu search: a walk with memory
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}
+  \pic at (0,0) {land};
+  \begin{scope}[visible on=<1>]
+    \draw[hop] (1.6,1.55) to[bend right=50] (0.8,1.85); \draw[hop, red!70!black] (0.8,1.85) to[bend right=50] (1.6,1.55);
+    \node[font=\tiny, red!70!black] at (1.2,2.75) {no memory: 2, 1, 2, 1, ...};
+  \end{scope}
+  \begin{scope}[visible on=<2->]
+    \foreach \a/\fa/\b/\fb in {0/7/1/5, 1/5/2/4, 2/4/3/6, 3/6/4/8, 4/8/5/7, 5/7/6/5, 6/5/7/3, 7/3/8/1}
+      {\draw[hop] (\a*0.8,\fa*0.3+0.35) to[bend left=50] (\b*0.8,\fb*0.3+0.35);}
+    \draw[green!50!black, thick] (6.4,0.65) circle (0.18);
+  \end{scope}
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <2->
+- Start at 0. Tabu: the last 2 solutions visited.
+- At 2: neighbour 1 is tabu, go to 3 (worse). At 3: 2 is tabu, go to 4 (worse).
+- Then 5, 6, 7, and 8: the global optimum, found by going *up* first.
+
+#+BEGIN_EXPORT latex
+\note{First overlay: without a tabu list, from the local optimum 2 the neighbours are 1 (cost 5) and 3 (cost 6): the best one is 1, so the search goes to 1, and from 1 the best neighbour is 2 again: it cycles between 2 and 1 forever. Second overlay, starting from 0: with the last two solutions tabu, the way back is always forbidden, and the search crosses the hill. After 8, it continues (to 9, cost 4) until the budget is over, and returns the best solution seen, 8.}
+#+END_EXPORT
+
+** Tabu search on the tour
+#+ATTR_BEAMER: :overlay <+(1)->
+- Move: a 2-opt move. Each step evaluates *all* the 500 000 neighbours, and takes the best allowed one.
+- Tabu: the two roads just removed cannot come back for 30 steps.
+- 1 000 clients, from greedy, 3 000 steps: 2 429 km, in 47 s.
+- Stronger per step than annealing, but each step costs much more.
+
+#+BEGIN_EXPORT latex
+\note{Storing whole tours in the tabu list would be too expensive: we store attributes of the moves, here the roads removed, with the step until which they are forbidden, in an n by n array. Annealing evaluates one neighbour per step, tabu search 500 000: annealing does 20 million cheap steps in 2 seconds, tabu search 3000 expensive steps in 47 seconds. Real implementations only evaluate the neighbours that connect close cities (candidate lists), which makes each step hundreds of times faster.}
+#+END_EXPORT
+
+* Genetic algorithms
+
+** Evolution as an algorithm
+#+BEGIN_EXPORT latex
+\begin{block}{Genetic algorithm (Holland, 1975)}
+A \emph{population} of solutions evolves over \emph{generations}: the best ones are \emph{selected} and \emph{combined} into children, which are slightly \emph{mutated}.
+\end{block}
+#+END_EXPORT
+
+#+ATTR_LATEX: :align ll
+| Biology            | Delivery tour                                     |
+|--------------------+---------------------------------------------------|
+| individual         | a tour (its *chromosome*: the order of clients)   |
+| fitness            | short tour, high fitness                          |
+| selection          | short tours have more children                    |
+| crossover          | a child takes parts of two parent tours           |
+| mutation           | a small random change (reverse a slice)           |
+
+#+BEGIN_EXPORT latex
+\note{John Holland, 1975, inspired by Darwin: individuals that fit the environment better have more descendants, and children mix the genes of their parents. Here nothing is alive: an individual is a solution, its fitness is how good it is. Crossover is what a single-solution method cannot do: combine good parts found by different solutions. Mutation keeps diversity, so that the population does not become 100 copies of the same tour.}
+#+END_EXPORT
+
+** Selection: the tournament
+#+ATTR_BEAMER: :overlay <+(1)->
+- Draw 3 tours at random from the population, keep the *shortest* as a parent.
+- A good tour wins often, a bad tour sometimes: diversity is kept.
+- Bigger tournaments: stronger pressure toward the best, less diversity.
+- *Elitism*: the best tour of a generation is copied into the next one, unchanged.
+
+#+BEGIN_EXPORT latex
+\note{Other selections exist, for example the roulette wheel, where the probability of being chosen is proportional to the fitness. The tournament is simple, needs no sorting, and its pressure is easy to tune with the size. With a tournament of size 1, the selection is random; with the size of the population, the best tour is always chosen and the population quickly loses its diversity. Elitism guarantees that the best tour found never gets lost.}
+#+END_EXPORT
+
+** Crossover: mixing two tours
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}[x=0.55cm]
+  \node[font=\scriptsize, anchor=east] at (0.2,0) {parent 1};
+  \foreach \c/\i in {A/1,B/2,F/6,G/7,H/8} {\node[gene] at (\i,0) {\c};}
+  \foreach \c/\i in {C/3,D/4,E/5} {\node[gene, onslide=<2->{keep}] at (\i,0) {\c};}
+  \node[font=\scriptsize, anchor=east] at (0.2,-0.9) {parent 2};
+  \foreach \c [count=\i] in {G,A,H,B,F,C,E,D} {\node[gene] at (\i,-0.9) {\c};}
+  \begin{scope}[visible on=<3->]
+    \node[gene, fill=gray!20, text=gray] at (6,-0.9) {C}; \node[gene, fill=gray!20, text=gray] at (7,-0.9) {E}; \node[gene, fill=gray!20, text=gray] at (8,-0.9) {D};
+    \foreach \c [count=\i] in {G,A,H,B,F} {\node[gene, from2] at (\i,-0.9) {\c};}
+  \end{scope}
+  \node[visible on=<2->, font=\scriptsize, anchor=east] at (0.2,-2) {child};
+  \begin{scope}[visible on=<2->] \foreach \c [count=\i from 3] in {C,D,E} {\node[gene, keep] at (\i,-2) {\c};} \end{scope}
+  \begin{scope}[visible on=<3->] \foreach \c/\i in {G/1,A/2,H/6,B/7,F/8} {\node[gene, from2] at (\i,-2) {\c};} \end{scope}
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <2->
+- *Order crossover*: copy a random slice of parent 1 (positions 3 to 5).
+#+ATTR_BEAMER: :overlay <3->
+- Fill the other places with the missing clients, *in the order of parent 2*.
+- The child is a valid tour: each client exactly once. Cutting and gluing would not be.
+
+#+BEGIN_EXPORT latex
+\note{The classic crossover of genetic algorithms cuts both parents at the same place and glues the beginning of one to the end of the other. For a tour, this gives children with repeated clients and missing ones: A B C D E then C E D, for example. Order crossover (Davis, 1985) keeps a slice of parent 1 at its place, and the relative order of the other clients from parent 2: G A H B F without C, D and E. The child G A C D E H B F inherits a piece of tour from each parent.}
+#+END_EXPORT
+
+** The whole loop
+#+ATTR_BEAMER: :overlay <+(1)->
+1. Generation 0: 100 random tours.
+2. Copy the best tour into the next generation (elitism).
+3. Fill the rest: two parents by tournament, their child by order crossover, and with probability 0.3 a mutation (reverse a random slice).
+4. The new generation replaces the old one. Repeat from 2.
+5. Return the best tour of the last generation.
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- 100 tours, 20 000 generations: 3 646 km in 16 s. *Worse than greedy!*
+
+#+BEGIN_EXPORT latex
+\note{The loop follows the vocabulary: select two parents, cross them, mutate the child, replace the population. The result is disappointing: two million children, and a tour 27 percent longer than greedy. The population starts from random tours (about 50000 km) and crossover only improves them slowly: mixing two bad tours rarely gives a good one, and nothing tries to improve a child locally. This is a well-known lesson: a pure genetic algorithm is weak on the tour.}
+#+END_EXPORT
+
+** A population needs local search
+#+ATTR_BEAMER: :overlay <+(1)->
+- Improve each child with hill climbing (2-opt) before it enters the population.
+- The population brings *diversity*, the local search brings *precision*.
+- 1 000 clients, 30 tours, 1 500 children: 2 383 km in 28 s.
+- A *memetic* algorithm: the best methods for the tour are hybrids of this kind.
+
+#+BEGIN_EXPORT latex
+\note{Every individual of the population is now a local optimum, and crossover mixes good tours instead of random ones. The result jumps from 3646 km to 2383 km, as good as a long annealing. In this version, each child replaces the worst tour of the population if it is better and not a copy. Memetic comes from meme, an idea that spreads and improves during a life, while genes only change between generations (Moscato, 1989). Other population methods follow nature too: the ants of the next section, or particle swarms, inspired by flocks of birds.}
+#+END_EXPORT
+
+* Ant colony optimization
+
+** Ants and pheromone
+*** The bridge
+    :PROPERTIES:
+    :BEAMER_col: 0.4
+    :END:
+#+BEGIN_EXPORT latex
+\begin{center}
+\begin{tikzpicture}
+  \node[circle, draw, fill=yellow!35, font=\tiny, minimum size=0.7cm] (N) at (0,0) {nest};
+  \node[circle, draw, fill=green!25, font=\tiny, minimum size=0.7cm] (F) at (4,0) {food};
+  \draw[gray!60, line width=0.6pt] (N) .. controls (1,2.2) and (3,2.2) .. (F);
+  \draw[gray!60, line width=0.6pt] (N) -- (F);
+  \begin{scope}[visible on=<2->]
+    \draw[orange!80!black, line width=3pt, opacity=0.6] (N) -- (F);
+    \draw[orange!80!black, line width=0.8pt, opacity=0.6] (N) .. controls (1,2.2) and (3,2.2) .. (F);
+  \end{scope}
+  \node[font=\tiny, gray] at (2,1.85) {long path};
+  \node[font=\tiny, gray] at (2,-0.3) {short path};
+\end{tikzpicture}
+\end{center}
+#+END_EXPORT
+
+*** The idea
+    :PROPERTIES:
+    :BEAMER_col: 0.58
+    :END:
+#+ATTR_BEAMER: :overlay <+(1)->
+- Ants leave *pheromone*, a scent, on their way, and prefer paths that smell strongly.
+- On the short path, the ants come back sooner: its pheromone grows faster.
+- The pheromone also *evaporates*: an abandoned path is forgotten.
+- The colony finds the short path. No ant knows it.
+
+#+BEGIN_EXPORT latex
+\note{This is the double bridge experiment with real Argentine ants (Deneubourg, Goss and colleagues, 1989): a nest and a food source linked by two bridges of different lengths. At first the ants choose at random, half and half. The ants that took the short bridge come back first, so the short bridge gets more pheromone, so more ants take it, and so on: after a few minutes, almost all the ants use the short bridge. No ant measures anything: the intelligence is in the colony, through the pheromone on the ground. Marco Dorigo turned this into an algorithm in his PhD thesis (1992), and tested it first on the travelling salesman problem.}
+#+END_EXPORT
+
+** Ant colony optimization
+#+BEGIN_EXPORT latex
+\begin{block}{Ant colony optimization (Dorigo, 1992)}
+Artificial ants build tours client by client. Each choice follows the \emph{pheromone} left by the previous ants on the roads, and the \emph{distance} (a greedy hint).
+\end{block}
+#+END_EXPORT
+
+#+ATTR_BEAMER: :overlay <+(1)->
+1. Put the same pheromone $\tau$ on every road.
+2. Each ant builds a tour: from client $i$, it goes to an unvisited $j$ with a probability proportional to $\tau_{ij}^{\alpha} \cdot (1 / d_{ij})^{\beta}$.
+3. *Evaporation*: every $\tau$ is multiplied by $1 - \rho$ (here $\rho = 0.1$).
+4. *Deposit*: each ant adds $1 / L$ on the roads of its tour, $L$ its length: short tours deposit more.
+5. Repeat from 2 with the next ants; return the best tour seen.
+
+#+BEGIN_EXPORT latex
+\note{A population method of another kind: the ants do not combine their tours as in a genetic algorithm, they share a memory, the pheromone, which is a matrix of n by n numbers. Alpha weights the pheromone (what the colony learned), beta the distance (greedy: a near client is attractive). With alpha = 0, each ant is a randomized greedy; with beta = 0, the ants ignore the distances. Evaporation keeps the colony from getting stuck on its first good tours: it is the diversification of this method, and the deposit is the intensification.}
+#+END_EXPORT
+
+** Choosing the next client
+The van is at W (course 05: A 3 km, B 4 km, C 10 km). Here $\alpha = \beta = 1$.
+
+#+ATTR_LATEX: :align l|ccc
+|                                 | A     | B     | C     |
+|---------------------------------+-------+-------+-------|
+| $1 / d$                         | 0.333 | 0.250 | 0.100 |
+| same pheromone: probability     | 0.49  | 0.37  | 0.15  |
+| pheromone on W B doubled        | 0.36  | 0.54  | 0.11  |
+
+#+ATTR_BEAMER: :overlay <+(1)->
+- Each weight is divided by their sum: $0.333 + 0.250 + 0.100 = 0.683$.
+- A near client is likely, a far one still possible: each ant builds a different tour.
+- Where the previous ants found good tours, the next ones follow.
+
+#+BEGIN_EXPORT latex
+\note{First row: the greedy hint, 1 over the distance. Second row: with the same pheromone everywhere, 0.333 / 0.683 = 0.49 for A, 0.250 / 0.683 = 0.37 for B, 0.100 / 0.683 = 0.15 for C. Greedy would always take A; an ant takes it about half of the time. Third row: if the road W B has twice as much pheromone as the others, its weight becomes 0.5, the sum 0.933, and B becomes the most likely choice (0.54). The best tour of course 05, W A C B W, uses the road W B: the colony can learn it even though greedy starts with A. To draw the client, the program draws a random number in [0, 1) and takes A below 0.49, B below 0.85, and C otherwise.}
+#+END_EXPORT
+
+** Ants on 1 000 clients
+#+ATTR_BEAMER: :overlay <+(1)->
+- 20 ants, 200 rounds: 2 838 km in 6 s. Barely better than greedy (2 867).
+- With hill climbing (2-opt) on each ant's tour: 10 ants, 30 rounds, 2 446 km in 10 s.
+- The same lesson as the genetic algorithm: a population method needs local search.
+- Better variants exist: the best ant only deposits, the pheromone is kept between bounds.
+
+#+BEGIN_EXPORT latex
+\note{The version run here is the first one, Ant System, with each ant choosing only among its 20 nearest unvisited clients, to be fast. Its weakness: all the ants deposit, so the pheromone of the first mediocre tours guides the search too long. Ant Colony System (Dorigo and Gambardella, 1997) and MAX-MIN Ant System (Stutzle and Hoos, 2000) fix this, and are among the good methods for the tour when combined with local search. Ant colony optimization is used for vehicle routing and for routing in telecommunication networks, where the "roads" change over time and the pheromone adapts.}
+#+END_EXPORT
+
+* Summary
+
+** 1 000 clients: the results
+#+ATTR_LATEX: :align lrr :font \small
+| Method (1 000 random clients, 100 km square) | Length (km) |   Time |
+|----------------------------------------------+-------------+--------|
+| Random tour                                  |      52 746 |      0 |
+| Greedy, nearest client first                 |       2 867 | $<$ 0.1 s |
+| Hill climbing (2-opt), from greedy           |       2 492 |  0.1 s |
+| 10 random restarts of hill climbing          |       2 545 |  0.4 s |
+| Tabu search, 3 000 steps                     |       2 429 |   47 s |
+| Simulated annealing, 20 million steps        |       2 455 |    2 s |
+| Simulated annealing, 200 million steps       |       2 376 |   25 s |
+| Genetic algorithm alone                      |       3 646 |   16 s |
+| Genetic algorithm + 2-opt                    |       2 383 |   28 s |
+| Ant colony optimization alone                |       2 838 |    6 s |
+| Ant colony optimization + 2-opt              |       2 446 |   10 s |
+
+#+BEGIN_EXPORT latex
+\note{One run of each method, one machine, Java; the times are orders of magnitude. The best tour is probably about 2300 km, so the best methods here are within 3 or 4 percent of it, and hill climbing within about 8 percent, in a tenth of a second. Ask students to read the table: what gives the biggest gain? Going from greedy to hill climbing. Which method would they choose with one second? With one minute? Professional solvers (LKH, by Helsgaun) use a richer move than 2-opt and get within a fraction of a percent.}
+#+END_EXPORT
+
+** Key takeaways
+- *Metaheuristics*: a solution, a cost, neighbours; a good solution, fast, with no guarantee.
+- *Single solution*: hill climbing, then escape the local optima with chance (annealing) or memory (tabu).
+- *Population*: genetic algorithms combine solutions, ants share a memory (pheromone).
+- Population methods become strong with local search: diversity plus precision.
+- Always compare on several runs, and with the same time budget.
+
+#+BEGIN_EXPORT latex
+\note{Ask students to place each method of the course in the table of the two families, and to say how it escapes the local optima: restarts by starting again, annealing by accepting bad moves, tabu by forbidding the way back, the genetic algorithm by keeping many solutions, the ants by evaporation and random choices.}
+#+END_EXPORT
+
+** The delivery tour, six ways
+#+ATTR_LATEX: :align lll :font \small
+| Paradigm            | Cost                            | Result                              |
+|---------------------+---------------------------------+-------------------------------------|
+| Brute force         | $O(n!)$                         | optimal, up to about 12 clients     |
+| Dynamic programming | $O(2^n n^2)$                    | optimal, up to about 25 clients     |
+| Branch and bound    | exponential, often much less    | optimal, depends on the bound       |
+| Greedy              | $O(n^2)$                        | 1 000 clients: 2 867 km             |
+| Local search        | the time we choose              | 1 000 clients: 2 376 to 2 492 km    |
+| Population + 2-opt  | the time we choose              | 1 000 clients: 2 383 to 2 446 km    |
+
+\pause
+- No paradigm wins everywhere: exact for small inputs, metaheuristics for large ones.
+
+#+BEGIN_EXPORT latex
+\note{The whole part on algorithmic paradigms on one problem. In practice they are combined: greedy gives the start of the local search, local search gives the first solution of branch and bound, branch and bound proves how far a heuristic tour is from the best. This ends the part on algorithmic paradigms.}
+#+END_EXPORT
+
+** Exercises
+1. Simulated annealing, $T = 10$: a move makes the tour 5 km longer. Probability of accepting it? And at $T = 1$?
+2. Order crossover: parent 1 = A B C D E F G H, slice positions 4 to 6; parent 2 = H G F E D C B A. The child?
+3. On the landscape of the course, from which starts does hill climbing find the best solution?
+4. Ants, $\alpha = \beta = 1$, same pheromone: from A, the roads to B, C, D are 7, 8 and 10 km. Probability of going to B?
+
+#+BEGIN_EXPORT latex
+\note{Answers. 1. e to the power -0.5, about 0.61; at T = 1, e to the power -5, about 0.007. 2. Keep D E F at positions 4 to 6; the others in the order of parent 2 without D, E, F: H G C B A, so the child is H G C D E F B A. 3. Solutions 5 to 9: the basin of attraction of 8. 4. Weights 1/7 = 0.143, 1/8 = 0.125, 1/10 = 0.100, sum 0.368: B with probability 0.143 / 0.368, about 0.39.}
+#+END_EXPORT
+
+** An open question: many solvers, one problem
+#+ATTR_BEAMER: :overlay <+(1)->
+- Greedy, hill climbing, annealing, tabu, genetic, ants: they all take a problem and return a tour.
+- The genetic algorithm and the ants *call* hill climbing; annealing starts from greedy.
+- The same annealing could solve the knapsack, with other neighbours.
+- How should we organize the code, so that solvers and problems can be swapped and combined?
+
+#+BEGIN_EXPORT latex
+\note{Ask students how they would write this in Java: seven static methods with different parameters? An interface Solver with a method solve? A function passed as a parameter, for the neighbours or the cost? These are questions of programming paradigms, the next part of the course: procedural, object-oriented and functional programming give three different answers.}
+#+END_EXPORT
