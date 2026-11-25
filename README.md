@@ -11,7 +11,7 @@ Faculty of Mathematics and Informatics, Department of Computer Science.
 
 Advanced programming is the set of techniques for designing programs that
 remain efficient, maintainable, reusable and understandable as their
-complexity grows. The course is organized in four parts:
+complexity grows. The course is organized in five parts:
 
 | Part                        | Question                                  |
 |-----------------------------|-------------------------------------------|
@@ -19,6 +19,7 @@ complexity grows. The course is organized in four parts:
 | Algorithmic paradigms       | How can we design efficient algorithms?   |
 | Programming paradigms       | How can we structure our programs?        |
 | Best programming practices  | How can we make our code maintainable?    |
+| Complexity theory           | Which problems can we solve efficiently?  |
 
 **Prerequisites:** at least one programming language, basic data
 structures (arrays, linked lists, stacks, queues, trees) and basic

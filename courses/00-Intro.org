@@ -102,31 +102,38 @@ their complexity grows.
 ** Chapters
 *** Advanced Data Structures
     :PROPERTIES:
-    :BEAMER_col: 0.25
+    :BEAMER_col: 0.19
     :BEAMER_env: block
     :END:
     How can we organize data efficiently?
 
 *** Algorithmic Paradigms
     :PROPERTIES:
-    :BEAMER_col: 0.25
+    :BEAMER_col: 0.19
     :BEAMER_env: block
     :END:
     How can we design efficient algorithms?
 
 *** Programming Paradigms
     :PROPERTIES:
-    :BEAMER_col: 0.25
+    :BEAMER_col: 0.19
     :BEAMER_env: block
     :END:
     How can we structure our programs?
 
 *** Best Programming Practices
     :PROPERTIES:
-    :BEAMER_col: 0.25
+    :BEAMER_col: 0.19
     :BEAMER_env: block
     :END:
     How can we make our code maintainable?
+
+*** Complexity Theory
+    :PROPERTIES:
+    :BEAMER_col: 0.19
+    :BEAMER_env: block
+    :END:
+    Which problems can we solve efficiently?
 ** Advanced Data Structures
    - Excludes elementary data structures (linked lists, trees, heap ...)
    - Hash tables
@@ -153,6 +160,12 @@ their complexity grows.
    - Principles: SOLID, DRY, KISS, YAGNI
    - Design: design patterns, antipatterns and code smells, refactoring
    - Verification: unit testing, TDD
+** Complexity Theory
+   Which problems can we solve efficiently, and which ones can we not?
+   - Decision problems, the classes P and NP
+   - Reductions and NP-completeness
+   - Undecidable problems
+   - Living with hard problems
 
 
 * Review: Basic data structures
